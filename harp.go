@@ -87,7 +87,8 @@ var (
 	noUpload bool
 	noDeploy bool
 	// tailLog  bool
-	script string
+	script    string
+	migration string
 
 	// TODO: can specify a single server, instead of the whole server set
 	serverSet  string
@@ -109,6 +110,7 @@ func main() {
 	flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
 	flag.StringVar(&serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
 	flag.StringVar(&serverSet, "server-set", "", "specify server sets to deploy, multiple sets are split by comma")
+	flag.StringVar(&migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
 	// flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
 	flag.Parse()
 
@@ -134,8 +136,10 @@ func main() {
 	switch args[0] {
 	case "deploy":
 		deploy(serverSets)
-	case "migration":
+	case "migrate":
 		// TODO
+		var server = cfg.Servers[serverSets[0]][0]
+		migrate(server, getList(migration))
 	case "info":
 		inspect(serverSets)
 	case "log":
@@ -145,6 +149,14 @@ func main() {
 		noUpload = true
 		deploy(serverSets)
 	}
+}
+
+func getList(str string) (strs []string) {
+	for _, str := range strings.Split(str, ",") {
+		strs = append(strs, strings.TrimSpace(str))
+	}
+
+	return
 }
 
 func deploy(serverSets []string) {
@@ -190,6 +202,8 @@ func tailLog(serverSets []string) {
 		for _, serv := range cfg.Servers[set] {
 			go func(set string, serv Server) {
 				session := serv.getSession()
+
+				// TODO: refactor
 				{
 					r, err := session.StdoutPipe()
 					if err != nil {
@@ -204,6 +218,7 @@ func tailLog(serverSets []string) {
 					}
 					go io.Copy(os.Stderr, r)
 				}
+
 				if err := session.Start(fmt.Sprintf("tail -f log/%s.log", cfg.App.Name)); err != nil {
 					exitf("tail -f log/%s.log error: %s", cfg.App, err)
 				}
