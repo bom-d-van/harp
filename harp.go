@@ -26,6 +26,7 @@ import (
 // 	rollback
 // 	snapshot
 
+// TODO: put everything inside app path
 // local
 // 	pwd/tmp/harp
 // 	pwd/migration
@@ -43,26 +44,17 @@ import (
 type Config struct {
 	GOOS, GOARCH string
 
+	// TODO
 	Rollback int
-	// Name     string
 
-	// Pkgs                      map[string]string
-	// Daemons                   []string
-	// Output                    string
-
+	// TODO: multiple instances support
+	// TODO: multiple apps support
 	App App
 
-	// Hook struct{ BeforeDeploy, AfterDeploy string }
-
-	// ServerGoPath, LocalGoPath string
-
-	// Files                     []Files
-	// App                       string
-	// Log                       string
+	// TODO
+	Hook struct{ BeforeDeploy, AfterDeploy string }
 
 	Servers map[string][]Server
-
-	// MigrationDir string
 }
 
 type App struct {
@@ -88,21 +80,16 @@ type Server struct {
 	client *ssh.Client
 }
 
-// type Files struct {
-// 	// Absolute    bool
-// 	// InBin bool
-// 	Src string
-// 	Dst string
-// }
-
 var (
 	verbose  bool
+	debugf   bool
 	noBuild  bool
 	noUpload bool
 	noDeploy bool
 	// tailLog  bool
 	script string
 
+	// TODO: can specify a single server, instead of the whole server set
 	serverSet  string
 	serverSets []string
 
@@ -113,6 +100,7 @@ var (
 func main() {
 	var configPath string
 	flag.StringVar(&configPath, "c", "harp.json", "config file path")
+	flag.BoolVar(&debugf, "debug", false, "print debug info")
 	flag.BoolVar(&verbose, "v", false, "verbose")
 	flag.BoolVar(&noBuild, "nb", false, "no build")
 	flag.BoolVar(&noUpload, "nu", false, "no upload")
@@ -152,22 +140,22 @@ func main() {
 		inspect(serverSets)
 	case "log":
 		tailLog(serverSets)
+	case "restart":
+		noBuild = true
+		noUpload = true
+		deploy(serverSets)
 	}
-
-	// if tailLog {
-	// script += "tail -f " + strings.Join(logs, " ")
-	// }
 }
 
 func deploy(serverSets []string) {
 	info := getInfo()
 	if !noBuild {
-		println("build")
+		fmt.Println("building")
 		build()
 	}
 
 	if !noUpload {
-		println("bundle")
+		fmt.Println("bundling")
 		bundle(info)
 	}
 
@@ -182,12 +170,12 @@ func deploy(serverSets []string) {
 				}
 
 				if !noUpload {
-					fmt.Printf("%s: %s@%s%s upload\n", set, server.User, server.Host, server.Port)
+					fmt.Printf("uploading: [%s] %s\n", set, server)
 					server.upload()
 				}
 
 				if !noDeploy {
-					fmt.Printf("%s: %s@%s%s deploy\n", set, server.User, server.Host, server.Port)
+					fmt.Printf("deploying: [%s] %s\n", set, server)
 					server.deploy()
 				}
 			}(set, server)
@@ -302,47 +290,9 @@ func cmd(name string, args ...string) string {
 	return string(output)
 }
 
-// func getClients() (client *ssh.Client) {
-// 	sock, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
-// 	if err != nil {
-// 		exitf("failed to dial unix SSH_AUTH_SOCK: %s", err)
-// 	}
-// 	signers, err := agent.NewClient(sock).Signers()
-// 	if err != nil {
-// 		exitf("failed to retrieve signers: %s", err)
-// 	}
-// 	auths := []ssh.AuthMethod{ssh.PublicKeys(signers...)}
-// 	config := &ssh.ClientConfig{
-// 		User: "app",
-// 		Auth: auths,
-// 	}
-
-// 	serv := cfg.Servers["dev"][0]
-// 	client, err = ssh.Dial("tcp", serv.Host+serv.Port, config)
-// 	if err != nil {
-// 		exitf("failed to dial: %s", err)
-// 	}
-
-// 	// ftpClient, err = sftp.NewClient(client)
-// 	// if err != nil {
-// 	// 	exitf("failed to open sftp client: %s", err)
-// 	// }
-
-// 	return
-// }
-
 func build() {
-	// var wg sync.WaitGroup
-	// for _, app := range cfg.Apps {
-	// wg.Add(1)
-	// go func(app App) {
-	// defer wg.Done()
 	app := cfg.App
 
-	// var cmd = exec.Command("go", "build", "-o", "tmp/"+name, "-tags", "prod", pkg)
-	// cmd.Dir = cfg.LocalGoPath + "/src/" + pkg
-	// cmd.Env = os.Environ()
-	// cmd.Env = append(cmd.Env, "GOOS="+cfg.GOOS, "GOARCH="+cfg.GOARCH)
 	var buildCmd = fmt.Sprintf("go build -o tmp/%s %s", app.Name, app.ImportPath)
 	if app.BuildCmd != "" {
 		buildCmd = app.BuildCmd
@@ -350,13 +300,6 @@ func build() {
 		buildCmd = app.BuildScript
 	}
 	cmd("sh", "-c", buildCmd)
-	// output, err := cmd.CombinedOutput()
-	// if err != nil {
-	// 	exitf("failed to build %s: %s: %s", pkg, err, string(output))
-	// }
-	// }(app)
-	// }
-	// wg.Wait()
 }
 
 func bundle(info string) {
@@ -370,7 +313,6 @@ func bundle(info string) {
 	tarw := tar.NewWriter(gzipw)
 	defer tarw.Close()
 
-	// for _, app := range cfg.Apps {
 	app := cfg.App
 	for _, files := range app.Files {
 		var path = GoPath + "/src/" + files
@@ -415,7 +357,6 @@ func bundle(info string) {
 		exitf("failed to stat %s: %s", file.Name(), err)
 	}
 	writeToTar(tarw, "bin/"+app.Name, file, fi)
-	// }
 
 	writeInfoToTar(tarw, info)
 }
@@ -510,7 +451,6 @@ func (s Server) deploy() {
 	var logs []string
 	var script = "mkdir -p log\n"
 	script += "mkdir -p pid\n"
-	// for _, app := range cfg.Apps {
 	app := cfg.App
 	var log = fmt.Sprintf("/home/app/log/%s.log", app.Name)
 	var pid = fmt.Sprintf("/home/app/pid/%s.pid", app.Name)
@@ -538,29 +478,18 @@ touch %s
 		path = strings.TrimSpace(string(output))
 	}
 	script += fmt.Sprintf("cd %s/src/%s\n", path, app.ImportPath)
-	script += fmt.Sprintf("nohup %s/bin/%s >> %s 2>&1 &\n", path, app.Name, log)
+	script += fmt.Sprintf("GOPATH=%s nohup %s/bin/%s >> %s 2>&1 &\n", s.GoPath, path, app.Name, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
-	// }
-	fmt.Printf("%s", script)
+
+	if debugf {
+		fmt.Printf("%s", script)
+	}
 
 	session := s.getSession()
 	defer session.Close()
 
-	// stdoutPipe, err := session.StdoutPipe()
-	// if err != nil {
-	// 	exitf("failed to get StdoutPipe: %s", err)
-	// }
-	// stderrPipe, err := session.StderrPipe()
-	// if err != nil {
-	// 	exitf("failed to get StderrPipe: %s", err)
-	// }
-	// go func() {
-	// 	io.Copy(os.Stdout, stdoutPipe)
-	// 	io.Copy(os.Stderr, stderrPipe)
-	// }()
 	var output []byte
 	output, err := session.CombinedOutput(script)
-	println(string(output))
 	if err != nil {
 		exitf("failed to exec %s: %s %s", script, string(output), err)
 	}
@@ -581,8 +510,6 @@ func (s *Server) getSession() *ssh.Session {
 			User: "app",
 			Auth: auths,
 		}
-
-		// serv := cfg.Servers["dev"][0]
 
 		s.client, err = ssh.Dial("tcp", s.Host+s.Port, config)
 		if err != nil {
