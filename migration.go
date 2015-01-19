@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/cheggaaa/pb"
@@ -16,16 +17,26 @@ import (
 func migrate(s Server, migrations []string) {
 	cmd("mkdir", "-p", "tmp/migrations")
 
-	for _, migration := range migrations {
-		base := filepath.Base(migration)
-		cmd("go", "build", "-o", "tmp/migrations/"+base, migration)
+	if !noBuild {
+		println("building")
+		for _, migration := range migrations {
+			base := filepath.Base(migration)
+			cmd("go", "build", "-o", "tmp/migrations/"+base, migration)
+		}
+
+		println("bundling")
+		bundleMigration(migrations)
 	}
 
-	bundleMigration(migrations)
+	if !noUpload {
+		println("uploading")
+		s.uploadMigration(migrations)
+	}
 
-	s.uploadMigration(migrations)
-
-	s.runMigration(migrations)
+	if !noDeploy {
+		println("running")
+		s.runMigration(migrations)
+	}
 }
 
 func bundleMigration(migrations []string) {
@@ -101,20 +112,40 @@ func (s Server) uploadMigration(migrations []string) {
 
 var migrationScript = template.Must(template.New("").Parse(`set -e
 tar mxf migrations.tar.gz
-{{range .}}
+cd {{.Path}}
+{{range .Migrations}}
 echo running {{.}}
-migration/{{.}}
+$HOME/migration/{{.}}
 {{end}}
 `))
 
 func (s Server) runMigration(migrations []string) {
+	var path = s.GoPath
+	if path == "" {
+		session := s.getSession()
+		output, _ := session.CombinedOutput("echo $GOPATH")
+		session.Close()
+		path = strings.TrimSpace(string(output))
+	}
+	if path == "" {
+		session := s.getSession()
+		output, _ := session.CombinedOutput("echo $HOME")
+		session.Close()
+		path = strings.TrimSpace(string(output))
+	}
+
 	session := s.getSession()
 	var script bytes.Buffer
 	var bases []string
 	for _, migration := range migrations {
 		bases = append(bases, filepath.Base(migration))
 	}
-	migrationScript.Execute(&script, bases)
+	migrationScript.Execute(&script, struct {
+		Migrations []string
+		Path       string
+	}{Migrations: bases, Path: s.GoPath + "/src/" + cfg.App.ImportPath})
+
+	fmt.Printf("--> %+v\n", script.String())
 
 	// TODO: refactor
 	{

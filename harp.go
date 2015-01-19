@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -51,8 +52,12 @@ type Config struct {
 	// TODO: multiple apps support
 	App App
 
-	// TODO
-	Hook struct{ BeforeDeploy, AfterDeploy string }
+	// TODO: migration and flag support (-after and -before)
+	Hooks struct {
+		Deploy struct {
+			Before, After string
+		}
+	}
 
 	Servers map[string][]Server
 }
@@ -467,13 +472,24 @@ func writeInfoToTar(tarw *tar.Writer, info string) {
 
 func (s Server) deploy() {
 	var logs []string
-	var script = "mkdir -p log\n"
-	script += "mkdir -p pid\n"
+	var script string
+
+	if cfg.Hooks.Deploy.Before != "" {
+		before, err := ioutil.ReadFile(cfg.Hooks.Deploy.Before)
+		if err != nil {
+			exitf("failed to read deploy before hook script: %s", err)
+		}
+		script += string(before)
+		script += "\n"
+	}
+
 	app := cfg.App
 	var log = fmt.Sprintf("/home/app/log/%s.log", app.Name)
 	var pid = fmt.Sprintf("/home/app/pid/%s.pid", app.Name)
 	logs = append(logs, log)
-	script += fmt.Sprintf(`tar mxf builds.tar.gz
+	script += fmt.Sprintf(`mkdir -p log
+mkdir -p pid
+tar mxf builds.tar.gz
 if [[ -f %[1]s ]]; then
 	target=$(cat %[1]s);
 	if ps -p $target > /dev/null; then
@@ -498,6 +514,15 @@ touch %s
 	script += fmt.Sprintf("cd %s/src/%s\n", path, app.ImportPath)
 	script += fmt.Sprintf("GOPATH=%s nohup %s/bin/%s >> %s 2>&1 &\n", s.GoPath, path, app.Name, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
+
+	if cfg.Hooks.Deploy.After != "" {
+		after, err := ioutil.ReadFile(cfg.Hooks.Deploy.After)
+		if err != nil {
+			exitf("failed to read deploy after hook script: %s", err)
+		}
+		script += string(after)
+		script += "\n"
+	}
 
 	if debugf {
 		fmt.Printf("%s", script)
