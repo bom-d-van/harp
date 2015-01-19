@@ -114,6 +114,12 @@ func main() {
 	// flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
 	flag.Parse()
 
+	args := flag.Args()
+	if len(args) == 0 {
+		printUsage()
+		return
+	}
+
 	var serverSets []string
 	if serverSet == "" {
 		fmt.Println("must specify server set with -server-set or -s")
@@ -126,12 +132,6 @@ func main() {
 	}
 
 	cfg = parseCfg(configPath)
-
-	args := flag.Args()
-	if len(args) == 0 {
-		flag.PrintDefaults()
-		return
-	}
 
 	switch args[0] {
 	case "deploy":
@@ -567,4 +567,18 @@ func exitf(format string, args ...interface{}) {
 	fmt.Printf(format, args...)
 	debug.PrintStack()
 	os.Exit(1)
+}
+
+func printUsage() {
+	fmt.Println(`harp is a go application deployment tool.
+usage:
+    harp [options] [action]
+actions:
+    deploy  Deploy your application (e.g. harp -s prod deploy).
+    migrate Run migrations on server (e.g. harp -s prod -m migration/reset_info.go migrate).
+    info    Print build info of servers (e.g. harp -s prod info).
+    log     Print real time logs of application (e.g. harp -s prod log).
+    restart Restart application (e.g. harp -s prod restart).
+options:`)
+	flag.PrintDefaults()
 }
