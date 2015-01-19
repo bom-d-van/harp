@@ -137,7 +137,7 @@ func main() {
 	case "deploy":
 		deploy(serverSets)
 	case "migrate":
-		// TODO
+		// TODO: could specify to run on all servers
 		var server = cfg.Servers[serverSets[0]][0]
 		migrate(server, getList(migration))
 	case "info":
