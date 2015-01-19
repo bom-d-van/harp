@@ -93,6 +93,7 @@ var (
 	// TODO: can specify a single server, instead of the whole server set
 	serverSet  string
 	serverSets []string
+	help       bool
 
 	cfg    Config
 	GoPath = os.Getenv("GOPATH")
@@ -106,6 +107,8 @@ func main() {
 	flag.BoolVar(&noBuild, "nb", false, "no build")
 	flag.BoolVar(&noUpload, "nu", false, "no upload")
 	flag.BoolVar(&noDeploy, "nd", false, "no deploy")
+	flag.BoolVar(&help, "help", false, "print helps")
+	flag.BoolVar(&help, "h", false, "print helps")
 	// flag.BoolVar(&tailLog, "log", false, "tail log after deploy")
 	flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
 	flag.StringVar(&serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
@@ -115,7 +118,7 @@ func main() {
 	flag.Parse()
 
 	args := flag.Args()
-	if len(args) == 0 {
+	if len(args) == 0 || help {
 		printUsage()
 		return
 	}
