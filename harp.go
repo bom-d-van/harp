@@ -86,12 +86,13 @@ type Server struct {
 }
 
 var (
-	verbose  bool
-	debugf   bool
-	noBuild  bool
-	noUpload bool
-	noDeploy bool
-	// tailLog  bool
+	verbose   bool
+	debugf    bool
+	noBuild   bool
+	noUpload  bool
+	noDeploy  bool
+	noFiles   bool
+	toTailLog bool
 	script    string
 	migration string
 
@@ -112,9 +113,10 @@ func main() {
 	flag.BoolVar(&noBuild, "nb", false, "no build")
 	flag.BoolVar(&noUpload, "nu", false, "no upload")
 	flag.BoolVar(&noDeploy, "nd", false, "no deploy")
+	flag.BoolVar(&noFiles, "nf", false, "no files")
 	flag.BoolVar(&help, "help", false, "print helps")
 	flag.BoolVar(&help, "h", false, "print helps")
-	// flag.BoolVar(&tailLog, "log", false, "tail log after deploy")
+	flag.BoolVar(&toTailLog, "log", false, "tail log after deploy")
 	flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
 	flag.StringVar(&serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
 	flag.StringVar(&serverSet, "server-set", "", "specify server sets to deploy, multiple sets are split by comma")
@@ -156,6 +158,10 @@ func main() {
 		noBuild = true
 		noUpload = true
 		deploy(serverSets)
+	}
+
+	if toTailLog {
+		tailLog(serverSets)
 	}
 }
 
@@ -227,7 +233,7 @@ func tailLog(serverSets []string) {
 					go io.Copy(os.Stderr, r)
 				}
 
-				if err := session.Start(fmt.Sprintf("tail -f log/%s.log", cfg.App.Name)); err != nil {
+				if err := session.Start(fmt.Sprintf("tail -f -n 20 log/%s.log", cfg.App.Name)); err != nil {
 					exitf("tail -f log/%s.log error: %s", cfg.App, err)
 				}
 			}(set, serv)
@@ -316,13 +322,19 @@ func cmd(name string, args ...string) string {
 func build() {
 	app := cfg.App
 
-	var buildCmd = fmt.Sprintf("go build -o tmp/%s %s", app.Name, app.ImportPath)
+	var buildCmd = fmt.Sprintf("go build -a -v -o tmp/%s %s", app.Name, app.ImportPath)
 	if app.BuildCmd != "" {
 		buildCmd = app.BuildCmd
 	} else if app.BuildScript != "" {
 		buildCmd = app.BuildScript
 	}
-	cmd("sh", "-c", buildCmd)
+	if debugf {
+		println("build cmd:", buildCmd)
+	}
+	output := cmd("sh", "-c", buildCmd)
+	if debugf {
+		print(output)
+	}
 }
 
 func bundle(info string) {
@@ -337,6 +349,10 @@ func bundle(info string) {
 	defer tarw.Close()
 
 	app := cfg.App
+	if noFiles {
+		goto bundleBinary
+	}
+
 	for _, files := range app.Files {
 		var path = GoPath + "/src/" + files
 		fi, err := os.Stat(path)
@@ -371,15 +387,18 @@ func bundle(info string) {
 		}
 	}
 
-	file, err := os.Open("tmp/" + app.Name)
-	if err != nil {
-		exitf("failed to open tmp/%s: %s", app.Name, err)
+bundleBinary:
+	if !noBuild {
+		file, err := os.Open("tmp/" + app.Name)
+		if err != nil {
+			exitf("failed to open tmp/%s: %s", app.Name, err)
+		}
+		fi, err := file.Stat()
+		if err != nil {
+			exitf("failed to stat %s: %s", file.Name(), err)
+		}
+		writeToTar(tarw, "bin/"+app.Name, file, fi)
 	}
-	fi, err := file.Stat()
-	if err != nil {
-		exitf("failed to stat %s: %s", file.Name(), err)
-	}
-	writeToTar(tarw, "bin/"+app.Name, file, fi)
 
 	writeInfoToTar(tarw, info)
 }
@@ -489,13 +508,13 @@ func (s Server) deploy() {
 	logs = append(logs, log)
 	script += fmt.Sprintf(`mkdir -p log
 mkdir -p pid
-tar mxf builds.tar.gz
 if [[ -f %[1]s ]]; then
 	target=$(cat %[1]s);
 	if ps -p $target > /dev/null; then
 		kill -KILL $target; > /dev/null 2>&1;
 	fi
 fi
+tar mxf builds.tar.gz
 touch %s
 `, pid, log)
 	var path = s.GoPath
