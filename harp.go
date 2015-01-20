@@ -270,6 +270,8 @@ func parseCfg(configPath string) (cfg Config) {
 	cfgFile, err := os.OpenFile(configPath, os.O_RDONLY, 0644)
 	if err != nil {
 		if os.IsNotExist(err) {
+			fmt.Printf("Config %s doesn't exist or is unspecified.\nTo specify with flag -c (e.g. -c harp.json)\n", configPath)
+			os.Exit(1)
 			return
 		}
 		exitf("failed to read config: %s", err)
