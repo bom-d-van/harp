@@ -100,6 +100,7 @@ var (
 	serverSet  string
 	serverSets []string
 	help       bool
+	versionf   bool
 
 	cfg    Config
 	GoPath = os.Getenv("GOPATH")
@@ -109,20 +110,33 @@ func main() {
 	var configPath string
 	flag.StringVar(&configPath, "c", "harp.json", "config file path")
 	flag.BoolVar(&debugf, "debug", false, "print debug info")
-	flag.BoolVar(&verbose, "v", false, "verbose")
+	// flag.BoolVar(&verbose, "v", false, "verbose")
+
 	flag.BoolVar(&noBuild, "nb", false, "no build")
 	flag.BoolVar(&noUpload, "nu", false, "no upload")
 	flag.BoolVar(&noDeploy, "nd", false, "no deploy")
 	flag.BoolVar(&noFiles, "nf", false, "no files")
+
+	flag.BoolVar(&toTailLog, "log", false, "tail log after deploy")
+
 	flag.BoolVar(&help, "help", false, "print helps")
 	flag.BoolVar(&help, "h", false, "print helps")
-	flag.BoolVar(&toTailLog, "log", false, "tail log after deploy")
+	flag.BoolVar(&versionf, "v", false, "print version num")
+	flag.BoolVar(&versionf, "version", false, "print version num")
+
 	flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
+
 	flag.StringVar(&serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
 	flag.StringVar(&serverSet, "server-set", "", "specify server sets to deploy, multiple sets are split by comma")
+
 	flag.StringVar(&migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
 	// flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
 	flag.Parse()
+
+	if versionf {
+		fmt.Println(version)
+		return
+	}
 
 	args := flag.Args()
 	if len(args) == 0 || help {
