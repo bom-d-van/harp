@@ -134,7 +134,7 @@ func main() {
 	flag.Parse()
 
 	if versionf {
-		fmt.Println(version)
+		fmt.Printf("0.%d\n", version)
 		return
 	}
 
