@@ -91,7 +91,7 @@ func (s Server) uploadMigration(migrations []string) {
 		defer bar.Finish()
 		dstw := io.MultiWriter(bar, dst)
 
-		_, err = fmt.Fprintln(dst, "C0644", fi.Size(), "migrations.tar.gz")
+		_, err = fmt.Fprintln(dst, "C0644", fi.Size(), "tmp/migrations.tar.gz")
 		if err != nil {
 			exitf("failed to open migrations.tar.gz: %s", err)
 		}
@@ -111,7 +111,7 @@ func (s Server) uploadMigration(migrations []string) {
 }
 
 var migrationScript = template.Must(template.New("").Parse(`set -e
-tar mxf migrations.tar.gz
+tar mxf tmp/migrations.tar.gz
 cd {{.Path}}
 {{range .Migrations}}
 echo running {{.}}
