@@ -6,10 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"log"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,10 +13,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/cheggaaa/pb"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 )
 
 // TODOs
@@ -66,23 +58,15 @@ type App struct {
 	Name       string
 	ImportPath string
 	Files      []string
-	Args       []string
 
-	BuildCmd    string
-	BuildScript string
-}
+	// TODO
+	Args []string
+	Envs map[string]string
 
-type Server struct {
-	Env    []string // key=value
-	GoPath string
-	LogDir string
-	PIDDir string
+	BuildCmd string
 
-	User string
-	Host string
-	Port string
-
-	client *ssh.Client
+	// TODO: could override default deploy script for out-of-band deploy
+	DeployScript string
 }
 
 var (
@@ -157,6 +141,13 @@ func main() {
 
 	cfg = parseCfg(configPath)
 
+	for _, set := range serverSets {
+		if _, ok := cfg.Servers[set]; !ok {
+			fmt.Println("server set doesn't exist:", set)
+			os.Exit(1)
+		}
+	}
+
 	switch args[0] {
 	case "deploy":
 		deploy(serverSets)
@@ -221,41 +212,6 @@ func deploy(serverSets []string) {
 			}(set, server)
 		}
 	}
-	wg.Wait()
-}
-
-// TODO: put logs from different servers into a buffer and print one at at time
-func tailLog(serverSets []string) {
-	for _, set := range serverSets {
-		for _, serv := range cfg.Servers[set] {
-			go func(set string, serv Server) {
-				session := serv.getSession()
-
-				// TODO: refactor
-				{
-					r, err := session.StdoutPipe()
-					if err != nil {
-						exitf("failed to get stdoutPipe: %s", err)
-					}
-					go io.Copy(os.Stdout, r)
-				}
-				{
-					r, err := session.StderrPipe()
-					if err != nil {
-						exitf("failed to get StderrPipe: %s", err)
-					}
-					go io.Copy(os.Stderr, r)
-				}
-
-				if err := session.Start(fmt.Sprintf("tail -f -n 20 log/%s.log", cfg.App.Name)); err != nil {
-					exitf("tail -f log/%s.log error: %s", cfg.App, err)
-				}
-			}(set, serv)
-		}
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(1)
 	wg.Wait()
 }
 
@@ -341,8 +297,6 @@ func build() {
 	var buildCmd = fmt.Sprintf("go build -a -v -o tmp/%s %s", app.Name, app.ImportPath)
 	if app.BuildCmd != "" {
 		buildCmd = app.BuildCmd
-	} else if app.BuildScript != "" {
-		buildCmd = app.BuildScript
 	}
 	if debugf {
 		println("build cmd:", buildCmd)
@@ -417,210 +371,6 @@ bundleBinary:
 	}
 
 	writeInfoToTar(tarw, info)
-}
-
-func (s Server) upload() {
-	if verbose {
-		log.Println("upload builds.tar.gz to server")
-	}
-
-	src, err := os.OpenFile("tmp/builds.tar.gz", os.O_RDONLY, 0644)
-	if err != nil {
-		exitf("failed to open tmp/builds.tar.gz: %s", err)
-	}
-	defer func() { src.Close() }()
-
-	fi, err := src.Stat()
-	if err != nil {
-		exitf("failed to retrieve file info of %s: %s", src.Name(), err)
-	}
-
-	session := s.getSession()
-	defer session.Close()
-
-	go func() {
-		dst, err := session.StdinPipe()
-		if err != nil {
-			exitf("failed to get StdinPipe: %s", err)
-		}
-		defer dst.Close()
-
-		bar := pb.New(int(fi.Size())).SetUnits(pb.U_BYTES)
-		bar.Start()
-		defer bar.Finish()
-		dstw := io.MultiWriter(bar, dst)
-
-		_, err = fmt.Fprintln(dst, "C0644", fi.Size(), "builds.tar.gz")
-		if err != nil {
-			exitf("failed to open builds.tar.gz: %s", err)
-		}
-		_, err = io.Copy(dstw, src)
-		if err != nil {
-			exitf("failed to upload builds.tar.gz: %s", err)
-		}
-		_, err = fmt.Fprint(dst, "\x00")
-		if err != nil {
-			exitf("failed to close builds.tar.gz: %s", err)
-		}
-	}()
-
-	if output, err := session.CombinedOutput("/usr/bin/scp -qrt ./"); err != nil {
-		exitf("Failed to run: %s %s", string(output), err)
-	}
-}
-
-func writeToTar(tarw *tar.Writer, name string, file io.Reader, fi os.FileInfo) {
-	header := new(tar.Header)
-	header.Name = name
-	header.Size = fi.Size()
-	header.Mode = int64(fi.Mode())
-	header.ModTime = fi.ModTime()
-
-	err := tarw.WriteHeader(header)
-	if err != nil {
-		exitf("failed to write tar header for %s: %s", name, err)
-	}
-
-	_, err = io.Copy(tarw, file)
-	if err != nil {
-		exitf("failed to write %s into tar file: %s", name, err)
-	}
-}
-
-func writeInfoToTar(tarw *tar.Writer, info string) {
-	header := new(tar.Header)
-	header.Name = cfg.App.Name + ".info"
-	header.Size = int64(len(info))
-	header.Mode = int64(0644)
-	header.ModTime = time.Now()
-
-	err := tarw.WriteHeader(header)
-	if err != nil {
-		exitf("failed to write tar header for %s: %s", header.Name, err)
-	}
-
-	_, err = tarw.Write([]byte(info))
-	if err != nil {
-		exitf("failed to write %s into tar file: %s", header.Name, err)
-	}
-}
-
-func (s Server) deploy() {
-	var logs []string
-	var script string
-
-	if cfg.Hooks.Deploy.Before != "" {
-		before, err := ioutil.ReadFile(cfg.Hooks.Deploy.Before)
-		if err != nil {
-			exitf("failed to read deploy before hook script: %s", err)
-		}
-		script += string(before)
-		script += "\n"
-	}
-
-	app := cfg.App
-	var log = fmt.Sprintf("/home/app/log/%s.log", app.Name)
-	var pid = fmt.Sprintf("/home/app/pid/%s.pid", app.Name)
-	logs = append(logs, log)
-	script += fmt.Sprintf(`mkdir -p log
-mkdir -p pid
-if [[ -f %[1]s ]]; then
-	target=$(cat %[1]s);
-	if ps -p $target > /dev/null; then
-		kill -KILL $target; > /dev/null 2>&1;
-	fi
-fi
-tar mxf builds.tar.gz
-touch %s
-`, pid, log)
-	var path = s.GoPath
-	if path == "" {
-		session := s.getSession()
-		output, _ := session.CombinedOutput("echo $GOPATH")
-		session.Close()
-		path = strings.TrimSpace(string(output))
-	}
-	if path == "" {
-		session := s.getSession()
-		output, _ := session.CombinedOutput("echo $HOME")
-		session.Close()
-		path = strings.TrimSpace(string(output))
-	}
-	script += fmt.Sprintf("cd %s/src/%s\n", path, app.ImportPath)
-	script += fmt.Sprintf("GOPATH=%s nohup %s/bin/%s >> %s 2>&1 &\n", s.GoPath, path, app.Name, log)
-	script += fmt.Sprintf("echo $! > %s\n", pid)
-
-	if cfg.Hooks.Deploy.After != "" {
-		after, err := ioutil.ReadFile(cfg.Hooks.Deploy.After)
-		if err != nil {
-			exitf("failed to read deploy after hook script: %s", err)
-		}
-		script += string(after)
-		script += "\n"
-	}
-
-	if debugf {
-		fmt.Printf("%s", script)
-	}
-
-	session := s.getSession()
-	defer session.Close()
-
-	var output []byte
-	output, err := session.CombinedOutput(script)
-	if err != nil {
-		exitf("failed to exec %s: %s %s", script, string(output), err)
-	}
-}
-
-func (s *Server) getSession() *ssh.Session {
-	if s.client == nil {
-		sock, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
-		if err != nil {
-			exitf("failed to dial unix SSH_AUTH_SOCK: %s", err)
-		}
-		signers, err := agent.NewClient(sock).Signers()
-		if err != nil {
-			exitf("failed to retrieve signers: %s", err)
-		}
-		auths := []ssh.AuthMethod{ssh.PublicKeys(signers...)}
-		config := &ssh.ClientConfig{
-			User: "app",
-			Auth: auths,
-		}
-
-		s.client, err = ssh.Dial("tcp", s.Host+s.Port, config)
-		if err != nil {
-			exitf("failed to dial: %s", err)
-		}
-	}
-
-	session, err := s.client.NewSession()
-	if err != nil {
-		exitf("failed to get session to server %s@%s:%s: %s", s.User, s.Host, s.Port, err)
-	}
-
-	return session
-}
-
-func (s Server) String() string {
-	return fmt.Sprintf("%s@%s%s", s.User, s.Host, s.Port)
-}
-
-func runCmd(sshc *ssh.Client, cmd string) (output []byte, err error) {
-	session, err := sshc.NewSession()
-	if err != nil {
-		exitf("failed to create session: %s", err)
-	}
-	defer session.Close()
-
-	output, err = session.CombinedOutput(cmd)
-	println(string(output))
-	if err != nil {
-		exitf("failed to exec %s: %s %s", cmd, string(output), err)
-	}
-
-	return
 }
 
 func exitf(format string, args ...interface{}) {
