@@ -105,25 +105,7 @@ fi
 tar mxf harp/%[3]s/build.tar.gz
 touch %[2]s
 `, pid, log, app.Name)
-	var path = s.GoPath
-	if path == "" {
-		session := s.getSession()
-		output, err := session.CombinedOutput("echo $GOPATH")
-		if err != nil {
-			fmt.Printf("echo $GOPATH on %s error: %s\n", s, err)
-		}
-		session.Close()
-		path = strings.TrimSpace(string(output))
-	}
-	if path == "" {
-		session := s.getSession()
-		output, err := session.CombinedOutput("echo $HOME")
-		if err != nil {
-			fmt.Printf("echo $HOME on %s error: %s\n", s, err)
-		}
-		session.Close()
-		path = strings.TrimSpace(string(output))
-	}
+	path := s.getGoPath()
 	envs := "GOPATH=" + s.GoPath
 	for k, v := range app.Envs {
 		envs += fmt.Sprintf(" %s=%s", k, v)
@@ -156,6 +138,30 @@ touch %[2]s
 	}
 
 	// TODO: save scripts(s) for starting, restarting, or kill app
+}
+
+func (s Server) getGoPath() string {
+	var path = s.GoPath
+	if path == "" {
+		session := s.getSession()
+		output, err := session.CombinedOutput("echo $GOPATH")
+		if err != nil {
+			fmt.Printf("echo $GOPATH on %s error: %s\n", s, err)
+		}
+		session.Close()
+		path = strings.TrimSpace(string(output))
+	}
+	if path == "" {
+		session := s.getSession()
+		output, err := session.CombinedOutput("echo $HOME")
+		if err != nil {
+			fmt.Printf("echo $HOME on %s error: %s\n", s, err)
+		}
+		session.Close()
+		path = strings.TrimSpace(string(output))
+	}
+
+	return path
 }
 
 func (s *Server) getSession() *ssh.Session {

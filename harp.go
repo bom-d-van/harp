@@ -229,7 +229,7 @@ func inspect(serverSets []string) {
 			go func(set string, serv Server) {
 				defer wg.Done()
 				session := serv.getSession()
-				output, err := session.CombinedOutput(fmt.Sprintf("cat %s.info", cfg.App.Name))
+				output, err := session.CombinedOutput(fmt.Sprintf("cat %s/src/%s/harp-build.info", serv.getGoPath(), cfg.App.ImportPath))
 				if err != nil {
 					exitf("failed to cat %s.info on %s: %s(%s)", cfg.App.Name, serv, err, string(output))
 				}

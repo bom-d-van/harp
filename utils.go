@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -29,7 +30,7 @@ func writeToTar(tarw *tar.Writer, name string, file io.Reader, fi os.FileInfo) {
 
 func writeInfoToTar(tarw *tar.Writer, info string) {
 	header := new(tar.Header)
-	header.Name = cfg.App.Name + ".info"
+	header.Name = fmt.Sprintf("src/%s/harp-build.info", cfg.App.ImportPath)
 	header.Size = int64(len(info))
 	header.Mode = int64(0644)
 	header.ModTime = time.Now()
