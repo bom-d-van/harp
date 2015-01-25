@@ -128,17 +128,31 @@ touch %[2]s
 		fmt.Printf("%s", script)
 	}
 
+	var output []byte
 	session := s.getSession()
 	defer session.Close()
-
-	var output []byte
 	output, err := session.CombinedOutput(script)
 	if err != nil {
 		exitf("failed to exec %s: %s %s", script, string(output), err)
 	}
 
 	// TODO: save scripts(s) for starting, restarting, or kill app
+	s.saveRestartScript(script)
+}
 
+func (s Server) saveRestartScript(script string) {
+	session := s.getSession()
+	defer session.Close()
+	cmd := fmt.Sprintf(`cat <<EOF > harp/%s/restart.sh
+%s
+EOF
+chmod +x harp/%s/restart.sh
+`, cfg.App.Name, script, cfg.App.Name)
+	cmd = strings.Replace(cmd, "$", "\\$", -1)
+	output, err := session.CombinedOutput(cmd)
+	if err != nil {
+		exitf("failed to save restart script on %s: %s: %s", s, err, string(output))
+	}
 }
 
 func (s Server) getGoPath() string {
