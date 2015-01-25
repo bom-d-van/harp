@@ -45,7 +45,7 @@ func writeInfoToTar(tarw *tar.Writer, info string) {
 	}
 }
 
-func runCmd(sshc *ssh.Client, cmd string) (output []byte, err error) {
+func runCmd(sshc *ssh.Client, cmd string) (output []byte) {
 	session, err := sshc.NewSession()
 	if err != nil {
 		exitf("failed to create session: %s", err)

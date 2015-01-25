@@ -43,6 +43,8 @@ func (s Server) upload() {
 		exitf("failed to retrieve file info of %s: %s", src.Name(), err)
 	}
 
+	s.initSetUp()
+
 	session := s.getSession()
 	defer session.Close()
 
@@ -58,7 +60,7 @@ func (s Server) upload() {
 		defer bar.Finish()
 		dstw := io.MultiWriter(bar, dst)
 
-		_, err = fmt.Fprintln(dst, "C0644", fi.Size(), "tmp/builds.tar.gz")
+		_, err = fmt.Fprintln(dst, "C0644", fi.Size(), "build.tar.gz")
 		if err != nil {
 			exitf("failed to open builds.tar.gz: %s", err)
 		}
@@ -72,7 +74,7 @@ func (s Server) upload() {
 		}
 	}()
 
-	if output, err := session.CombinedOutput("/usr/bin/scp -qrt ./"); err != nil {
+	if output, err := session.CombinedOutput("/usr/bin/scp -qrt harp/" + cfg.App.Name); err != nil {
 		exitf("Failed to run: %s %s", string(output), err)
 	}
 }
@@ -91,35 +93,44 @@ func (s Server) deploy() {
 	}
 
 	app := cfg.App
-	var log = fmt.Sprintf("/home/app/log/%s.log", app.Name)
-	var pid = fmt.Sprintf("/home/app/pid/%s.pid", app.Name)
+	log := fmt.Sprintf("$HOME/harp/%s/app.log", app.Name)
+	pid := fmt.Sprintf("$HOME/harp/%s/app.pid", app.Name)
 	logs = append(logs, log)
-	script += fmt.Sprintf(`mkdir -p log
-mkdir -p pid
-if [[ -f %[1]s ]]; then
+	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
 	target=$(cat %[1]s);
 	if ps -p $target > /dev/null; then
 		kill -KILL $target; > /dev/null 2>&1;
 	fi
 fi
-tar mxf tmp/builds.tar.gz
-touch %s
-`, pid, log)
+tar mxf harp/%[3]s/build.tar.gz
+touch %[2]s
+`, pid, log, app.Name)
 	var path = s.GoPath
 	if path == "" {
 		session := s.getSession()
-		output, _ := session.CombinedOutput("echo $GOPATH")
+		output, err := session.CombinedOutput("echo $GOPATH")
+		if err != nil {
+			fmt.Printf("echo $GOPATH on %s error: %s\n", s, err)
+		}
 		session.Close()
 		path = strings.TrimSpace(string(output))
 	}
 	if path == "" {
 		session := s.getSession()
-		output, _ := session.CombinedOutput("echo $HOME")
+		output, err := session.CombinedOutput("echo $HOME")
+		if err != nil {
+			fmt.Printf("echo $HOME on %s error: %s\n", s, err)
+		}
 		session.Close()
 		path = strings.TrimSpace(string(output))
 	}
+	envs := "GOPATH=" + s.GoPath
+	for k, v := range app.Envs {
+		envs += fmt.Sprintf(" %s=%s", k, v)
+	}
+	args := strings.Join(app.Args, " ")
 	script += fmt.Sprintf("cd %s/src/%s\n", path, app.ImportPath)
-	script += fmt.Sprintf("GOPATH=%s nohup %s/bin/%s >> %s 2>&1 &\n", s.GoPath, path, app.Name, log)
+	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, path, app.Name, args, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
 
 	if cfg.Hooks.Deploy.After != "" {
@@ -143,28 +154,13 @@ touch %s
 	if err != nil {
 		exitf("failed to exec %s: %s %s", script, string(output), err)
 	}
+
+	// TODO: save scripts(s) for starting, restarting, or kill app
 }
 
 func (s *Server) getSession() *ssh.Session {
 	if s.client == nil {
-		sock, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
-		if err != nil {
-			exitf("failed to dial unix SSH_AUTH_SOCK: %s", err)
-		}
-		signers, err := agent.NewClient(sock).Signers()
-		if err != nil {
-			exitf("failed to retrieve signers: %s", err)
-		}
-		auths := []ssh.AuthMethod{ssh.PublicKeys(signers...)}
-		config := &ssh.ClientConfig{
-			User: "app",
-			Auth: auths,
-		}
-
-		s.client, err = ssh.Dial("tcp", s.Host+s.Port, config)
-		if err != nil {
-			exitf("failed to dial: %s", err)
-		}
+		s.initClient()
 	}
 
 	session, err := s.client.NewSession()
@@ -179,7 +175,30 @@ func (s Server) String() string {
 	return fmt.Sprintf("%s@%s%s", s.User, s.Host, s.Port)
 }
 
-func (s Server) initSetUp() {
-	session := s.getSession()
-	session.CombinedOutput("mkdir")
+func (s *Server) initClient() {
+	sock, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+	if err != nil {
+		exitf("failed to dial unix SSH_AUTH_SOCK: %s", err)
+	}
+	signers, err := agent.NewClient(sock).Signers()
+	if err != nil {
+		exitf("failed to retrieve signers: %s", err)
+	}
+	auths := []ssh.AuthMethod{ssh.PublicKeys(signers...)}
+	config := &ssh.ClientConfig{
+		User: "app",
+		Auth: auths,
+	}
+
+	s.client, err = ssh.Dial("tcp", s.Host+s.Port, config)
+	if err != nil {
+		exitf("failed to dial: %s", err)
+	}
+}
+
+func (s *Server) initSetUp() {
+	if s.client == nil {
+		s.initClient()
+	}
+	runCmd(s.client, "mkdir -p harp/"+cfg.App.Name)
 }

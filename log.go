@@ -30,8 +30,8 @@ func tailLog(serverSets []string) {
 					go io.Copy(os.Stderr, r)
 				}
 
-				if err := session.Start(fmt.Sprintf("tail -f -n 20 log/%s.log", cfg.App.Name)); err != nil {
-					exitf("tail -f log/%s.log error: %s", cfg.App, err)
+				if err := session.Start(fmt.Sprintf("tail -f -n 20 harp/%s/app.log", cfg.App.Name)); err != nil {
+					exitf("tail -f harp/%s/app.log error: %s", cfg.App, err)
 				}
 			}(set, serv)
 		}

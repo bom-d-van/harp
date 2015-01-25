@@ -14,5 +14,7 @@ RUN echo "export VISIBLE=now" >> /etc/profile
 
 RUN useradd -ou 0 -g 0 app
 
+# TODO: generate ssh keys
+
 EXPOSE 22
 CMD ["/usr/sbin/sshd", "-D"]

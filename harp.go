@@ -19,6 +19,10 @@ import (
 // 	rollback
 // 	snapshot
 
+// PRINCIPLES
+// KISS
+// Convinent first, put things together
+
 // TODO: put everything inside app path
 // local
 // 	pwd/tmp/harp
@@ -27,10 +31,11 @@ import (
 // server
 // 	$GOPATH/bin
 // 	$GOPATH/src
-// 	$GOPATH/pid
-// 	$GOPATH/log
-// 	$GOPATH/migration/$APP
-// 	$GOPATH/script
+// 	$HOME/harp/$APP/build.$num.tar.gz
+// 	$HOME/harp/$APP/pid
+// 	$HOME/harp/$APP/log
+// 	$HOME/harp/$APP/migration.tar.gz
+// 	$HOME/harp/$APP/script
 
 // use cases 1: in pwd: go build -> upload -> run
 
@@ -118,7 +123,7 @@ func main() {
 	flag.Parse()
 
 	if versionf {
-		fmt.Printf("0.%d\n", version)
+		fmt.Printf("0.1.%d\n", version)
 		return
 	}
 
@@ -158,7 +163,7 @@ func main() {
 	case "info":
 		inspect(serverSets)
 	case "log":
-		tailLog(serverSets)
+		toTailLog = true
 	case "restart":
 		noBuild = true
 		noUpload = true

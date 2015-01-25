@@ -76,6 +76,8 @@ func (s Server) uploadMigration(migrations []string) {
 		exitf("failed to retrieve file info of %s: %s", src.Name(), err)
 	}
 
+	s.initSetUp()
+
 	session := s.getSession()
 	defer session.Close()
 
@@ -91,7 +93,7 @@ func (s Server) uploadMigration(migrations []string) {
 		defer bar.Finish()
 		dstw := io.MultiWriter(bar, dst)
 
-		_, err = fmt.Fprintln(dst, "C0644", fi.Size(), "tmp/migrations.tar.gz")
+		_, err = fmt.Fprintln(dst, "C0644", fi.Size(), "migrations.tar.gz")
 		if err != nil {
 			exitf("failed to open migrations.tar.gz: %s", err)
 		}
@@ -105,21 +107,24 @@ func (s Server) uploadMigration(migrations []string) {
 		}
 	}()
 
-	if output, err := session.CombinedOutput("/usr/bin/scp -qrt ./"); err != nil {
+	if output, err := session.CombinedOutput("/usr/bin/scp -qrt harp/" + cfg.App.Name); err != nil {
 		exitf("Failed to run: %s %s", string(output), err)
 	}
 }
 
 var migrationScript = template.Must(template.New("").Parse(`set -e
-tar mxf tmp/migrations.tar.gz
+{{$app := .App}}
+cd harp/{{$app}}
+tar mxf migrations.tar.gz
 cd {{.Path}}
 {{range .Migrations}}
-echo running {{.}}
-$HOME/migration/{{.}}
+echo "running {{.}}"
+$HOME/harp/{{$app}}/migration/{{.}}
 {{end}}
 `))
 
 func (s Server) runMigration(migrations []string) {
+	// TODO: to refactor
 	var path = s.GoPath
 	if path == "" {
 		session := s.getSession()
@@ -140,12 +145,18 @@ func (s Server) runMigration(migrations []string) {
 	for _, migration := range migrations {
 		bases = append(bases, filepath.Base(migration))
 	}
-	migrationScript.Execute(&script, struct {
+	err := migrationScript.Execute(&script, struct {
 		Migrations []string
 		Path       string
-	}{Migrations: bases, Path: s.GoPath + "/src/" + cfg.App.ImportPath})
+		App        string
+	}{Migrations: bases, Path: path + "/src/" + cfg.App.ImportPath, App: cfg.App.Name})
+	if err != nil {
+		exitf("failed to generate migration script: %s", err)
+	}
 
-	fmt.Printf("--> %+v\n", script.String())
+	if debugf {
+		println(script.String())
+	}
 
 	// TODO: refactor
 	{
@@ -163,8 +174,7 @@ func (s Server) runMigration(migrations []string) {
 		go io.Copy(os.Stderr, r)
 	}
 
-	err := session.Run(script.String())
-	if err != nil {
+	if err := session.Run(script.String()); err != nil {
 		exitf("failed at runing script: %s\n%s", err, script)
 	}
 }
