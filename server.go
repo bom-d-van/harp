@@ -99,12 +99,12 @@ func (s Server) deploy() {
 	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
 	target=$(cat %[1]s);
 	if ps -p $target > /dev/null; then
-		kill -KILL $target; > /dev/null 2>&1;
+		kill -%[4]s $target; > /dev/null 2>&1;
 	fi
 fi
 tar mxf harp/%[3]s/build.tar.gz
 touch %[2]s
-`, pid, log, app.Name)
+`, pid, log, app.Name, app.KillSig)
 	path := s.getGoPath()
 	envs := "GOPATH=" + s.GoPath
 	for k, v := range app.Envs {
@@ -138,6 +138,7 @@ touch %[2]s
 	}
 
 	// TODO: save scripts(s) for starting, restarting, or kill app
+
 }
 
 func (s Server) getGoPath() string {

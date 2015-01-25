@@ -70,6 +70,8 @@ type App struct {
 
 	BuildCmd string
 
+	KillSig string
+
 	// TODO: could override default deploy script for out-of-band deploy
 	DeployScript string
 }
@@ -254,6 +256,10 @@ func parseCfg(configPath string) (cfg Config) {
 	err = json.NewDecoder(cfgFile).Decode(&cfg)
 	if err != nil {
 		exitf("failed to parse config: %s", err)
+	}
+
+	if cfg.App.KillSig == "" {
+		cfg.App.KillSig = "KILL"
 	}
 
 	return
