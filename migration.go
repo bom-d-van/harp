@@ -14,14 +14,13 @@ import (
 	"github.com/cheggaaa/pb"
 )
 
-func migrate(s Server, migrations []string) {
+func migrate(s Server, migrations []Migration) {
 	cmd("mkdir", "-p", "tmp/migrations")
 
 	if !noBuild {
 		println("building")
 		for _, migration := range migrations {
-			base := filepath.Base(migration)
-			cmd("go", "build", "-o", "tmp/migrations/"+base, migration)
+			cmd("go", "build", "-o", "tmp/migrations/"+migration.Base, migration.File)
 		}
 
 		println("bundling")
@@ -39,7 +38,7 @@ func migrate(s Server, migrations []string) {
 	}
 }
 
-func bundleMigration(migrations []string) {
+func bundleMigration(migrations []Migration) {
 	dst, err := os.OpenFile("tmp/migrations.tar.gz", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
@@ -51,20 +50,19 @@ func bundleMigration(migrations []string) {
 	defer tarw.Close()
 
 	for _, migration := range migrations {
-		base := filepath.Base(migration)
-		file, err := os.Open("tmp/migrations/" + base)
+		file, err := os.Open("tmp/migrations/" + migration.Base)
 		if err != nil {
-			exitf("failed to open tmp/migrations/%s: %s", base, err)
+			exitf("failed to open tmp/migrations/%s: %s", migration.Base, err)
 		}
 		fi, err := file.Stat()
 		if err != nil {
 			exitf("failed to stat %s: %s", file.Name(), err)
 		}
-		writeToTar(tarw, "migration/"+base, file, fi)
+		writeToTar(tarw, "migration/"+migration.Base, file, fi)
 	}
 }
 
-func (s Server) uploadMigration(migrations []string) {
+func (s Server) uploadMigration(migrations []Migration) {
 	src, err := os.OpenFile("tmp/migrations.tar.gz", os.O_RDONLY, 0644)
 	if err != nil {
 		exitf("failed to open tmp/migrations.tar.gz: %s", err)
@@ -118,12 +116,12 @@ cd harp/{{$app}}
 tar mxf migrations.tar.gz
 cd {{.Path}}
 {{range .Migrations}}
-echo "running {{.}}"
-$HOME/harp/{{$app}}/migration/{{.}}
+echo "running {{.Base}}"
+{{.Envs}} $HOME/harp/{{$app}}/migration/{{.Base}} {{.Args}}
 {{end}}
 `))
 
-func (s Server) runMigration(migrations []string) {
+func (s Server) runMigration(migrations []Migration) {
 	// TODO: to refactor
 	var path = s.GoPath
 	if path == "" {
@@ -141,15 +139,11 @@ func (s Server) runMigration(migrations []string) {
 
 	session := s.getSession()
 	var script bytes.Buffer
-	var bases []string
-	for _, migration := range migrations {
-		bases = append(bases, filepath.Base(migration))
-	}
 	err := migrationScript.Execute(&script, struct {
-		Migrations []string
+		Migrations []Migration
 		Path       string
 		App        string
-	}{Migrations: bases, Path: path + "/src/" + cfg.App.ImportPath, App: cfg.App.Name})
+	}{Migrations: migrations, Path: path + "/src/" + cfg.App.ImportPath, App: cfg.App.Name})
 	if err != nil {
 		exitf("failed to generate migration script: %s", err)
 	}
@@ -177,4 +171,43 @@ func (s Server) runMigration(migrations []string) {
 	if err := session.Run(script.String()); err != nil {
 		exitf("failed at runing script: %s\n%s", err, script)
 	}
+}
+
+type Migration struct {
+	File string
+	Base string
+	Envs string
+	Args string
+}
+
+// TODO: support file path containing spaces
+func retrieveMigrations(args []string) (ms []Migration) {
+	for _, arg := range args {
+		var migration Migration
+		parts := strings.Split(arg, " ")
+		for index, part := range parts {
+			if strings.Contains(part, "=") {
+				migration.Envs += part + " "
+			} else if doesFileExist(part) {
+				migration.File = part
+				migration.Base = filepath.Base(migration.File)
+				if len(parts) > index+1 {
+					migration.Args = strings.Join(parts[index+1:], " ")
+				}
+				break
+			} else {
+				migration.Envs += part + " "
+			}
+		}
+
+		migration.Envs = strings.Trim(migration.Envs, " ")
+		ms = append(ms, migration)
+	}
+
+	return
+}
+
+func doesFileExist(file string) bool {
+	_, err := os.Stat(file)
+	return err == nil
 }

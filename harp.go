@@ -34,8 +34,6 @@ import (
 // 	$HOME/harp/$APP/migration.tar.gz
 // 	$HOME/harp/$APP/script
 
-// use cases 1: in pwd: go build -> upload -> run
-
 type Config struct {
 	GOOS, GOARCH string
 
@@ -157,8 +155,9 @@ func main() {
 		deploy(serverSets)
 	case "migrate":
 		// TODO: could specify to run on all servers
+		migrations := retrieveMigrations(args[1:])
 		var server = cfg.Servers[serverSets[0]][0]
-		migrate(server, getList(migration))
+		migrate(server, migrations)
 	case "info":
 		inspect(serverSets)
 	case "log":
@@ -172,14 +171,6 @@ func main() {
 	if toTailLog {
 		tailLog(serverSets)
 	}
-}
-
-func getList(str string) (strs []string) {
-	for _, str := range strings.Split(str, ",") {
-		strs = append(strs, strings.TrimSpace(str))
-	}
-
-	return
 }
 
 func deploy(serverSets []string) {
