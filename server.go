@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 
-	"github.com/cheggaaa/pb"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
@@ -27,61 +27,51 @@ type Server struct {
 	client *ssh.Client
 }
 
-func (s Server) upload() {
-	if verbose {
-		log.Println("upload builds.tar.gz to server")
-	}
-
-	src, err := os.OpenFile("tmp/builds.tar.gz", os.O_RDONLY, 0644)
-	if err != nil {
-		exitf("failed to open tmp/builds.tar.gz: %s", err)
-	}
-	defer func() { src.Close() }()
-
-	fi, err := src.Stat()
-	if err != nil {
-		exitf("failed to retrieve file info of %s: %s", src.Name(), err)
-	}
-
+func (s Server) upload(info string) {
 	s.initSetUp()
 
-	session := s.getSession()
-	defer session.Close()
+	ssh := fmt.Sprintf(`ssh -l %s -p %s`, s.User, strings.TrimLeft(s.Port, ":"))
+	appName := cfg.App.Name
+	var wg sync.WaitGroup
+	wg.Add(len(cfg.App.Files))
+	for _, src := range cfg.App.Files {
+		go func(src string) {
+			dst := fmt.Sprintf("app@%s:harp/%s/files/%s", s.Host, appName, strings.Replace(src, "/", "_", -1))
+			src = filepath.Join(GoPath, "src", src)
+			output, err := exec.Command("rsync", "-az", "--delete", "-e", ssh, src, dst).CombinedOutput()
+			if err != nil {
+				exitf("failed to sync %s: %s: %s", src, err, string(output))
+			}
+			wg.Done()
+		}(src)
+	}
 
+	wg.Add(1)
 	go func() {
-		dst, err := session.StdinPipe()
+		defer wg.Done()
+		dst := fmt.Sprintf("app@%s:harp/%[2]s/%[2]s", s.Host, appName)
+		output, err := exec.Command("rsync", "-az", "--delete", "-e", ssh, "tmp/"+appName, dst).CombinedOutput()
 		if err != nil {
-			exitf("failed to get StdinPipe: %s", err)
-		}
-		defer dst.Close()
-
-		bar := pb.New(int(fi.Size())).SetUnits(pb.U_BYTES)
-		bar.Start()
-		defer bar.Finish()
-		dstw := io.MultiWriter(bar, dst)
-
-		_, err = fmt.Fprintln(dst, "C0644", fi.Size(), "build.tar.gz")
-		if err != nil {
-			exitf("failed to open builds.tar.gz: %s", err)
-		}
-		_, err = io.Copy(dstw, src)
-		if err != nil {
-			exitf("failed to upload builds.tar.gz: %s", err)
-		}
-		_, err = fmt.Fprint(dst, "\x00")
-		if err != nil {
-			exitf("failed to close builds.tar.gz: %s", err)
+			exitf("failed to sync binary %s: %s: %s", appName, err, string(output))
 		}
 	}()
 
-	if output, err := session.CombinedOutput("/usr/bin/scp -qrt harp/" + cfg.App.Name); err != nil {
-		exitf("Failed to run: %s %s", string(output), err)
+	session := s.getSession()
+	defer session.Close()
+	cmd := fmt.Sprintf("cat <<EOF > harp/%s/harp-build.info\n%s\nEOF", appName, info)
+	output, err := session.CombinedOutput(cmd)
+	if err != nil {
+		exitf("failed to save build info: %s: %s", err, string(output))
 	}
+
+	wg.Wait()
 }
 
 func (s Server) deploy() {
 	var logs []string
 	var script string
+
+	script += "set -e\n"
 
 	if cfg.Hooks.Deploy.Before != "" {
 		before, err := ioutil.ReadFile(cfg.Hooks.Deploy.Before)
@@ -91,6 +81,20 @@ func (s Server) deploy() {
 		script += string(before)
 		script += "\n"
 	}
+
+	gopath := s.getGoPath()
+
+	script += fmt.Sprintf("mkdir -p %s/bin %s/src\n", gopath, gopath)
+
+	for _, dst := range cfg.App.Files {
+		src := fmt.Sprintf("harp/%s/files/%s", cfg.App.Name, strings.Replace(dst, "/", "_", -1))
+		dst = fmt.Sprintf("%s/src/%s", gopath, dst)
+		script += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
+		script += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
+	}
+
+	script += fmt.Sprintf("cp harp/%s/harp-build.info %s/src/%s/\n", cfg.App.Name, gopath, cfg.App.ImportPath)
+	script += fmt.Sprintf("rsync -az --delete harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
 
 	app := cfg.App
 	log := fmt.Sprintf("$HOME/harp/%s/app.log", app.Name)
@@ -102,17 +106,16 @@ func (s Server) deploy() {
 		kill -%[4]s $target; > /dev/null 2>&1;
 	fi
 fi
-tar mxf harp/%[3]s/build.tar.gz
 touch %[2]s
 `, pid, log, app.Name, app.KillSig)
-	path := s.getGoPath()
+
 	envs := "GOPATH=" + s.GoPath
 	for k, v := range app.Envs {
 		envs += fmt.Sprintf(" %s=%s", k, v)
 	}
 	args := strings.Join(app.Args, " ")
-	script += fmt.Sprintf("cd %s/src/%s\n", path, app.ImportPath)
-	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, path, app.Name, args, log)
+	script += fmt.Sprintf("cd %s/src/%s\n", gopath, app.ImportPath)
+	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, gopath, app.Name, args, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
 
 	if cfg.Hooks.Deploy.After != "" {
@@ -221,5 +224,5 @@ func (s *Server) initSetUp() {
 	if s.client == nil {
 		s.initClient()
 	}
-	runCmd(s.client, "mkdir -p harp/"+cfg.App.Name)
+	runCmd(s.client, fmt.Sprintf("mkdir -p harp/%s/files", cfg.App.Name))
 }

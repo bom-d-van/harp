@@ -54,7 +54,6 @@ func runCmd(sshc *ssh.Client, cmd string) (output []byte) {
 	defer session.Close()
 
 	output, err = session.CombinedOutput(cmd)
-	println(string(output))
 	if err != nil {
 		exitf("failed to exec %s: %s %s", cmd, string(output), err)
 	}

@@ -1,14 +1,11 @@
 package main
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -192,11 +189,6 @@ func deploy(serverSets []string) {
 		build()
 	}
 
-	if !noUpload {
-		fmt.Println("bundling")
-		bundle(info)
-	}
-
 	var wg sync.WaitGroup
 	for _, set := range serverSets {
 		for _, server := range cfg.Servers[set] {
@@ -209,7 +201,7 @@ func deploy(serverSets []string) {
 
 				if !noUpload {
 					fmt.Printf("uploading: [%s] %s\n", set, server)
-					server.upload()
+					server.upload(info)
 				}
 
 				if !noDeploy {
@@ -316,72 +308,6 @@ func build() {
 	if debugf {
 		print(output)
 	}
-}
-
-func bundle(info string) {
-	dst, err := os.OpenFile("tmp/builds.tar.gz", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		panic(err)
-	}
-	defer dst.Close()
-	gzipw := gzip.NewWriter(dst)
-	defer gzipw.Close()
-	tarw := tar.NewWriter(gzipw)
-	defer tarw.Close()
-
-	app := cfg.App
-	if noFiles {
-		goto bundleBinary
-	}
-
-	for _, files := range app.Files {
-		var path = GoPath + "/src/" + files
-		fi, err := os.Stat(path)
-		if err != nil {
-			exitf("failed to stat %s: %s", path, err)
-		}
-		if fi.IsDir() {
-			filepath.Walk(path, func(path string, fi os.FileInfo, err error) error {
-				if err != nil {
-					exitf("filepath walk error from %s: %s", path, err)
-				}
-				if fi.IsDir() {
-					return nil
-				}
-				name := strings.TrimPrefix(path, GoPath+"/src/")
-				file, err := os.Open(path)
-				if err != nil {
-					exitf("failed to open file %s: %s", path, err)
-				}
-				writeToTar(tarw, "src/"+name, file, fi)
-
-				return nil
-			})
-		} else {
-			file, err := os.Open(path)
-			if err != nil {
-				exitf("failed to open %s: %s", path, err)
-			}
-			var p string
-			p = "src/" + files
-			writeToTar(tarw, p, file, fi)
-		}
-	}
-
-bundleBinary:
-	if !noBuild {
-		file, err := os.Open("tmp/" + app.Name)
-		if err != nil {
-			exitf("failed to open tmp/%s: %s", app.Name, err)
-		}
-		fi, err := file.Stat()
-		if err != nil {
-			exitf("failed to stat %s: %s", file.Name(), err)
-		}
-		writeToTar(tarw, "bin/"+app.Name, file, fi)
-	}
-
-	writeInfoToTar(tarw, info)
 }
 
 func exitf(format string, args ...interface{}) {
