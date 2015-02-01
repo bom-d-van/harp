@@ -59,7 +59,6 @@ type App struct {
 	ImportPath string
 	Files      []string
 
-	// TODO
 	Args []string
 	Envs map[string]string
 
@@ -273,7 +272,6 @@ func isUsingGit() bool {
 
 func cmd(name string, args ...string) string {
 	cmd := exec.Command(name, args...)
-	// cmd.Dir
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "GOOS="+cfg.GOOS, "GOARCH="+cfg.GOARCH)
 

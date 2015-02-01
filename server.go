@@ -92,26 +92,28 @@ func (s Server) deploy() {
 	if debugf {
 		println("deplying", s.String())
 	}
-	var logs []string
-	var script string
 
-	script += "set -e\n"
+	var (
+		logs                           []string
+		beforeRsync, rsync, afterRsync string
+	)
+
+	beforeRsync += "set -e\n"
 
 	if cfg.Hooks.Deploy.Before != "" {
 		before, err := ioutil.ReadFile(cfg.Hooks.Deploy.Before)
 		if err != nil {
 			exitf("failed to read deploy before hook script: %s", err)
 		}
-		script += string(before)
-		script += "\n"
+		beforeRsync += string(before)
+		beforeRsync += "\n"
 	}
 
 	gopath := s.getGoPath()
 
-	script += fmt.Sprintf("mkdir -p %s/bin %s/src\n", gopath, gopath)
+	rsync += fmt.Sprintf("mkdir -p %s/bin %s/src\n", gopath, gopath)
 
 	// TODO: handle callback error
-	// TODO: save a script without files processing
 	for _, dst := range cfg.App.Files {
 		src := fmt.Sprintf("harp/%s/files/%s", cfg.App.Name, strings.Replace(dst, "/", "_", -1))
 		odst := dst
@@ -124,18 +126,18 @@ func (s Server) deploy() {
 			dst += "/"
 		}
 
-		script += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
-		script += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
+		rsync += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
+		rsync += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
 	}
 
-	script += fmt.Sprintf("cp harp/%s/harp-build.info %s/src/%s/\n", cfg.App.Name, gopath, cfg.App.ImportPath)
-	script += fmt.Sprintf("rsync -az --delete harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
+	rsync += fmt.Sprintf("cp harp/%s/harp-build.info %s/src/%s/\n", cfg.App.Name, gopath, cfg.App.ImportPath)
+	rsync += fmt.Sprintf("rsync -az --delete harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
 
 	app := cfg.App
 	log := fmt.Sprintf("$HOME/harp/%s/app.log", app.Name)
 	pid := fmt.Sprintf("$HOME/harp/%s/app.pid", app.Name)
 	logs = append(logs, log)
-	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
+	afterRsync += fmt.Sprintf(`if [[ -f %[1]s ]]; then
 	target=$(cat %[1]s);
 	if ps -p $target > /dev/null; then
 		kill -%[4]s $target; > /dev/null 2>&1;
@@ -149,19 +151,20 @@ touch %[2]s
 		envs += fmt.Sprintf(" %s=%s", k, v)
 	}
 	args := strings.Join(app.Args, " ")
-	script += fmt.Sprintf("cd %s/src/%s\n", gopath, app.ImportPath)
-	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, gopath, app.Name, args, log)
-	script += fmt.Sprintf("echo $! > %s\n", pid)
+	afterRsync += fmt.Sprintf("cd %s/src/%s\n", gopath, app.ImportPath)
+	afterRsync += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, gopath, app.Name, args, log)
+	afterRsync += fmt.Sprintf("echo $! > %s\n", pid)
 
 	if cfg.Hooks.Deploy.After != "" {
 		after, err := ioutil.ReadFile(cfg.Hooks.Deploy.After)
 		if err != nil {
 			exitf("failed to read deploy after hook script: %s", err)
 		}
-		script += string(after)
-		script += "\n"
+		afterRsync += string(after)
+		afterRsync += "\n"
 	}
 
+	script := beforeRsync + rsync + afterRsync
 	if debugf {
 		fmt.Printf("%s", script)
 	}
@@ -174,8 +177,8 @@ touch %[2]s
 		exitf("failed to exec %s: %s %s", script, string(output), err)
 	}
 
-	// TODO: save scripts(s) for starting, restarting, or kill app
-	s.saveRestartScript(script)
+	// TODO: save scripts(s) for kill app
+	s.saveRestartScript(beforeRsync + afterRsync)
 }
 
 func (s Server) saveRestartScript(script string) {
