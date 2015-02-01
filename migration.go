@@ -9,12 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/cheggaaa/pb"
 )
 
-func migrate(s Server, migrations []Migration) {
+func migrate(servers []*Server, migrations []Migration) {
 	cmd("mkdir", "-p", "tmp/migrations")
 
 	if !noBuild {
@@ -27,15 +28,24 @@ func migrate(s Server, migrations []Migration) {
 		bundleMigration(migrations)
 	}
 
-	if !noUpload {
-		println("uploading")
-		s.uploadMigration(migrations)
-	}
+	var wg sync.WaitGroup
+	wg.Add(len(servers))
+	for _, server := range servers {
+		go func(server *Server) {
+			if !noUpload {
+				println(server.String(), "uploading")
+				server.uploadMigration(migrations)
+			}
 
-	if !noDeploy {
-		println("running")
-		s.runMigration(migrations)
+			if !noDeploy {
+				println(server.String(), "running")
+				server.runMigration(migrations)
+			}
+
+			wg.Done()
+		}(server)
 	}
+	wg.Wait()
 }
 
 func bundleMigration(migrations []Migration) {
