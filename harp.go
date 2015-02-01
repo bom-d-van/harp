@@ -18,7 +18,7 @@ import (
 
 // PRINCIPLES
 // KISS
-// Convinent first, put things together
+// BC (Being Convinent: all things in one place)
 
 // TODO: put everything inside app path
 // local
@@ -51,7 +51,7 @@ type Config struct {
 		}
 	}
 
-	Servers map[string][]Server
+	Servers map[string][]*Server
 }
 
 type App struct {
@@ -71,28 +71,31 @@ type App struct {
 }
 
 var (
-	verbose   bool
-	debugf    bool
-	noBuild   bool
-	noUpload  bool
-	noDeploy  bool
-	noFiles   bool
-	toTailLog bool
-	script    string
-	migration string
+	// verbose   bool
+	configPath string
+	debugf     bool
+	noBuild    bool
+	noUpload   bool
+	noDeploy   bool
+	noFiles    bool
+	toTailLog  bool
+	script     string
+	migration  string
 
 	// TODO: can specify a single server, instead of the whole server set
+	server     string
 	serverSet  string
 	serverSets []string
 	help       bool
 	versionf   bool
+
+	allf bool
 
 	cfg    Config
 	GoPath = strings.Split(os.Getenv("GOPATH"), ":")[0]
 )
 
 func main() {
-	var configPath string
 	flag.StringVar(&configPath, "c", "harp.json", "config file path")
 	flag.BoolVar(&debugf, "debug", false, "print debug info")
 	// flag.BoolVar(&verbose, "v", false, "verbose")
@@ -113,6 +116,8 @@ func main() {
 
 	flag.StringVar(&serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
 	flag.StringVar(&serverSet, "server-set", "", "specify server sets to deploy, multiple sets are split by comma")
+	flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
+	flag.BoolVar(&allf, "all", false, "execute action on all server")
 
 	flag.StringVar(&migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
 	// flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
@@ -129,50 +134,33 @@ func main() {
 		return
 	}
 
-	var serverSets []string
-	if serverSet == "" {
-		fmt.Println("must specify server set with -server-set or -s")
-		os.Exit(1)
-	}
-
-	serverSets = strings.Split(serverSet, ",")
-	for i, server := range serverSets {
-		serverSets[i] = strings.TrimSpace(server)
-	}
-
 	cfg = parseCfg(configPath)
-
-	for _, set := range serverSets {
-		if _, ok := cfg.Servers[set]; !ok {
-			fmt.Println("server set doesn't exist:", set)
-			os.Exit(1)
-		}
-	}
+	servers := retrieveServers()
 
 	switch args[0] {
 	case "deploy":
-		deploy(serverSets)
+		deploy(servers)
 	case "migrate":
 		// TODO: could specify to run on all servers
 		migrations := retrieveMigrations(args[1:])
-		var server = cfg.Servers[serverSets[0]][0]
-		migrate(server, migrations)
+		// var server = cfg.Servers[serverSets[0]][0]
+		migrate(servers, migrations)
 	case "info":
-		inspect(serverSets)
+		inspect(servers)
 	case "log":
 		toTailLog = true
 	case "restart":
 		noBuild = true
 		noUpload = true
-		deploy(serverSets)
+		deploy(servers)
 	}
 
 	if toTailLog {
-		tailLog(serverSets)
+		tailLog(servers)
 	}
 }
 
-func deploy(serverSets []string) {
+func deploy(servers []*Server) {
 	info := getInfo()
 	if !noBuild {
 		fmt.Println("building")
@@ -180,48 +168,45 @@ func deploy(serverSets []string) {
 	}
 
 	var wg sync.WaitGroup
-	for _, set := range serverSets {
-		for _, server := range cfg.Servers[set] {
-			wg.Add(1)
-			go func(set string, server Server) {
-				defer wg.Done()
-				if server.Port == "" {
-					server.Port = ":22"
-				}
+	// for _, set := range serverSets {
+	// 	for _, server := range cfg.Servers[set] {
+	for _, server := range servers {
+		wg.Add(1)
+		go func(server *Server) {
+			defer wg.Done()
+			if !noUpload {
+				fmt.Printf("uploading: [%s] %s\n", server.set, server)
+				server.upload(info)
+			}
 
-				if !noUpload {
-					fmt.Printf("uploading: [%s] %s\n", set, server)
-					server.upload(info)
-				}
-
-				if !noDeploy {
-					fmt.Printf("deploying: [%s] %s\n", set, server)
-					server.deploy()
-				}
-			}(set, server)
-		}
+			if !noDeploy {
+				fmt.Printf("deploying: [%s] %s\n", server.set, server)
+				server.deploy()
+			}
+		}(server)
 	}
+	// }
 	wg.Wait()
 }
 
 // TODO: use buffer
-func inspect(serverSets []string) {
+func inspect(servers []*Server) {
 	var wg sync.WaitGroup
-	for _, set := range serverSets {
-		for _, serv := range cfg.Servers[set] {
-			wg.Add(1)
-			go func(set string, serv Server) {
-				defer wg.Done()
-				session := serv.getSession()
-				output, err := session.CombinedOutput(fmt.Sprintf("cat %s/src/%s/harp-build.info", serv.getGoPath(), cfg.App.ImportPath))
-				if err != nil {
-					exitf("failed to cat %s.info on %s: %s(%s)", cfg.App.Name, serv, err, string(output))
-				}
-				fmt.Println("=====", serv.String())
-				fmt.Println(string(output))
-			}(set, serv)
-		}
+	// for _, set := range servers {
+	for _, serv := range servers {
+		wg.Add(1)
+		go func(serv *Server) {
+			defer wg.Done()
+			session := serv.getSession()
+			output, err := session.CombinedOutput(fmt.Sprintf("cat %s/src/%s/harp-build.info", serv.getGoPath(), cfg.App.ImportPath))
+			if err != nil {
+				exitf("failed to cat %s.info on %s: %s(%s)", cfg.App.Name, serv, err, string(output))
+			}
+			fmt.Println("=====", serv.String())
+			fmt.Println(string(output))
+		}(serv)
 	}
+	// }
 	wg.Wait()
 }
 
@@ -242,6 +227,15 @@ func parseCfg(configPath string) (cfg Config) {
 
 	if cfg.App.KillSig == "" {
 		cfg.App.KillSig = "KILL"
+	}
+
+	for k, set := range cfg.Servers {
+		for _, s := range set {
+			s.set = k
+			if s.Port == "" {
+				s.Port = ":22"
+			}
+		}
 	}
 
 	return
@@ -320,4 +314,62 @@ actions:
     restart Restart application (e.g. harp -s prod restart).
 options:`)
 	flag.PrintDefaults()
+}
+
+func retrieveServers() []*Server {
+	var serverSets []string
+	for _, set := range strings.Split(serverSet, ",") {
+		set = strings.TrimSpace(set)
+		if set == "" {
+			continue
+		}
+		serverSets = append(serverSets, set)
+	}
+
+	var servers []string
+	for _, server := range strings.Split(server, ",") {
+		server = strings.TrimSpace(server)
+		if server == "" {
+			continue
+		}
+		servers = append(servers, server)
+	}
+
+	if allf {
+		for set, _ := range cfg.Servers {
+			serverSets = append(serverSets, set)
+		}
+	}
+
+	if server == "" && serverSet == "" {
+		println("please specify servers or server sets to deploy (-s or -server).")
+		println("specify -all flag to execute the action on all servers.")
+		os.Exit(1)
+	}
+
+	var targetServers []*Server
+	for _, set := range serverSets {
+		servers, ok := cfg.Servers[set]
+		if !ok {
+			fmt.Println("server set doesn't exist:", set)
+			os.Exit(1)
+		}
+		targetServers = append(targetServers, servers...)
+	}
+
+serversLoop:
+	for _, server := range servers {
+		for _, set := range cfg.Servers {
+			for _, s := range set {
+				if server == s.String() {
+					targetServers = append(targetServers, s)
+					continue serversLoop
+				}
+			}
+		}
+		println("can't find server:", server)
+		os.Exit(1)
+	}
+
+	return targetServers
 }

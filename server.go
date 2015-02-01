@@ -24,6 +24,8 @@ type Server struct {
 	Host string
 	Port string
 
+	set string
+
 	client *ssh.Client
 }
 
@@ -233,6 +235,7 @@ func (s *Server) getSession() *ssh.Session {
 	return session
 }
 
+// name@host:port
 func (s Server) String() string {
 	return fmt.Sprintf("%s@%s%s", s.User, s.Host, s.Port)
 }
@@ -254,7 +257,7 @@ func (s *Server) initClient() {
 
 	s.client, err = ssh.Dial("tcp", s.Host+s.Port, config)
 	if err != nil {
-		exitf("failed to dial: %s", err)
+		exitf("failed to dial %s: %s", s.Host+s.Port, err)
 	}
 }
 
