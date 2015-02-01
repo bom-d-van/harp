@@ -37,9 +37,12 @@ func (s Server) upload(info string) {
 	wg.Add(len(cfg.App.Files))
 	for _, src := range cfg.App.Files {
 		go func(src string) {
-			defer wg.Done()
 			osrc := src
-			fmt.Printf("%s: uploading\n", osrc)
+			defer func() {
+				fmt.Printf("%s uploaded: %s\n", s, osrc)
+				wg.Done()
+			}()
+			fmt.Printf("%s uploading: %s\n", s, osrc)
 			dst := fmt.Sprintf("app@%s:harp/%s/files/%s", s.Host, appName, strings.Replace(src, "/", "_", -1))
 			src = filepath.Join(GoPath, "src", src)
 			if fi, err := os.Stat(src); err != nil {
@@ -51,30 +54,36 @@ func (s Server) upload(info string) {
 			if err != nil {
 				exitf("failed to sync %s: %s: %s", src, err, string(output))
 			}
-			fmt.Printf("%s: uploaded\n", osrc)
 		}(src)
 	}
 
 	// binary upload
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer func() {
+			fmt.Printf("%s uploaded: binary %s\n", s, appName)
+			wg.Done()
+		}()
+		fmt.Printf("%s uploading: binary %s\n", s, appName)
 		dst := fmt.Sprintf("app@%s:harp/%[2]s/%[2]s", s.Host, appName)
 		output, err := exec.Command("rsync", "-az", "--delete", "-e", ssh, "tmp/"+appName, dst).CombinedOutput()
 		if err != nil {
 			exitf("failed to sync binary %s: %s: %s", appName, err, string(output))
 		}
-		fmt.Printf("binary %s: uploaded\n", appName)
 	}()
 
 	// build info upload
-	session := s.getSession()
-	cmd := fmt.Sprintf("cat <<EOF > harp/%s/harp-build.info\n%s\nEOF", appName, info)
-	output, err := session.CombinedOutput(cmd)
-	if err != nil {
-		exitf("failed to save build info: %s: %s", err, string(output))
-	}
-	session.Close()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		session := s.getSession()
+		cmd := fmt.Sprintf("cat <<EOF > harp/%s/harp-build.info\n%s\nEOF", appName, info)
+		output, err := session.CombinedOutput(cmd)
+		if err != nil {
+			exitf("failed to save build info: %s: %s", err, string(output))
+		}
+		session.Close()
+	}()
 
 	wg.Wait()
 }
