@@ -20,3 +20,4 @@ docker run -P -p 49154:22 -d -v ~/.ssh/id_rsa.pub:/home/app/.ssh/authorized_keys
 
 tmp/harp -c test/harp.json -s prod deploy
 tmp/harp -c test/harp.json -s prod migrate "AppEnv=prod test/migration.go -arg1 val1 -arg2 val2" test/migration2.go
+tmp/harp -c test/harp.json -s prod migrate github.com/bom-d-van/harp/test/migration3
