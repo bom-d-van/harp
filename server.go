@@ -30,22 +30,32 @@ type Server struct {
 func (s Server) upload(info string) {
 	s.initSetUp()
 
+	var wg sync.WaitGroup
 	ssh := fmt.Sprintf(`ssh -l %s -p %s`, s.User, strings.TrimLeft(s.Port, ":"))
 	appName := cfg.App.Name
-	var wg sync.WaitGroup
+	// files upload
 	wg.Add(len(cfg.App.Files))
 	for _, src := range cfg.App.Files {
 		go func(src string) {
+			defer wg.Done()
+			osrc := src
+			fmt.Printf("%s: uploading\n", osrc)
 			dst := fmt.Sprintf("app@%s:harp/%s/files/%s", s.Host, appName, strings.Replace(src, "/", "_", -1))
 			src = filepath.Join(GoPath, "src", src)
+			if fi, err := os.Stat(src); err != nil {
+				exitf("failed to stat %s: %s", src, err)
+			} else if fi.IsDir() {
+				src += "/"
+			}
 			output, err := exec.Command("rsync", "-az", "--delete", "-e", ssh, src, dst).CombinedOutput()
 			if err != nil {
 				exitf("failed to sync %s: %s: %s", src, err, string(output))
 			}
-			wg.Done()
+			fmt.Printf("%s: uploaded\n", osrc)
 		}(src)
 	}
 
+	// binary upload
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -54,20 +64,25 @@ func (s Server) upload(info string) {
 		if err != nil {
 			exitf("failed to sync binary %s: %s: %s", appName, err, string(output))
 		}
+		fmt.Printf("binary %s: uploaded\n", appName)
 	}()
 
+	// build info upload
 	session := s.getSession()
-	defer session.Close()
 	cmd := fmt.Sprintf("cat <<EOF > harp/%s/harp-build.info\n%s\nEOF", appName, info)
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
 		exitf("failed to save build info: %s: %s", err, string(output))
 	}
+	session.Close()
 
 	wg.Wait()
 }
 
 func (s Server) deploy() {
+	if debugf {
+		println("deplying", s.String())
+	}
 	var logs []string
 	var script string
 
@@ -86,9 +101,20 @@ func (s Server) deploy() {
 
 	script += fmt.Sprintf("mkdir -p %s/bin %s/src\n", gopath, gopath)
 
+	// TODO: handle callback error
+	// TODO: save a script without files processing
 	for _, dst := range cfg.App.Files {
 		src := fmt.Sprintf("harp/%s/files/%s", cfg.App.Name, strings.Replace(dst, "/", "_", -1))
+		odst := dst
 		dst = fmt.Sprintf("%s/src/%s", gopath, dst)
+
+		if fi, err := os.Stat(filepath.Join(GoPath, "src", odst)); err != nil {
+			exitf("failed to stat %s: %s", src, err)
+		} else if fi.IsDir() {
+			src += "/"
+			dst += "/"
+		}
+
 		script += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
 		script += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
 	}
