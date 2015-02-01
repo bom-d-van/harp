@@ -89,7 +89,7 @@ var (
 	versionf   bool
 
 	cfg    Config
-	GoPath = os.Getenv("GOPATH")
+	GoPath = strings.Split(os.Getenv("GOPATH"), ":")[0]
 )
 
 func main() {
