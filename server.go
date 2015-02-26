@@ -44,14 +44,22 @@ func (s Server) upload(info string) {
 				fmt.Printf("%s uploaded: %s\n", s, osrc)
 				wg.Done()
 			}()
-			fmt.Printf("%s uploading: %s\n", s, osrc)
 			dst := fmt.Sprintf("app@%s:harp/%s/files/%s", s.Host, appName, strings.Replace(src, "/", "_", -1))
-			src = filepath.Join(GoPath, "src", src)
-			if fi, err := os.Stat(src); err != nil {
-				exitf("failed to stat %s: %s", src, err)
-			} else if fi.IsDir() {
-				src += "/"
+			for _, path := range GoPaths {
+				src = filepath.Join(path, "src", osrc)
+				if fi, err := os.Stat(src); err != nil {
+					src = ""
+					continue
+				} else if fi.IsDir() {
+					src += "/"
+				}
+
+				break
 			}
+			if src == "" {
+				exitf("failed to find %s from %s", osrc, GoPaths)
+			}
+			fmt.Printf("%s uploading: %s (from %s)\n", s, osrc, src)
 			output, err := exec.Command("rsync", "-az", "--delete", "-e", ssh, src, dst).CombinedOutput()
 			if err != nil {
 				exitf("failed to sync %s: %s: %s", src, err, string(output))
@@ -121,11 +129,18 @@ func (s Server) deploy() {
 		odst := dst
 		dst = fmt.Sprintf("%s/src/%s", gopath, dst)
 
-		if fi, err := os.Stat(filepath.Join(GoPath, "src", odst)); err != nil {
-			exitf("failed to stat %s: %s", src, err)
-		} else if fi.IsDir() {
-			src += "/"
-			dst += "/"
+		var hasErr bool
+		for _, path := range GoPaths {
+			hasErr = false
+			if fi, err := os.Stat(filepath.Join(path, "src", odst)); err != nil {
+				hasErr = true
+			} else if fi.IsDir() {
+				src += "/"
+				dst += "/"
+			}
+		}
+		if hasErr {
+			exitf("failed to find %s from %s", odst, GoPaths)
 		}
 
 		rsync += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))

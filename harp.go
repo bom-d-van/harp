@@ -91,8 +91,9 @@ var (
 
 	allf bool
 
-	cfg    Config
-	GoPath = strings.Split(os.Getenv("GOPATH"), ":")[0]
+	cfg     Config
+	GoPaths = strings.Split(os.Getenv("GOPATH"), ":")
+	GoPath  = GoPaths[0]
 )
 
 func main() {

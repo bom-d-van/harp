@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# TODO: retire this script with go tests
+
 set -e
 
 go build -o tmp/harp

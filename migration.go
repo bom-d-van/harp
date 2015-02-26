@@ -227,6 +227,11 @@ func doesFileExist(file string) bool {
 		return true
 	}
 
-	_, err = os.Stat(filepath.Join(GoPath, "src", file))
-	return err == nil
+	for _, path := range GoPaths {
+		_, err = os.Stat(filepath.Join(path, "src", file))
+		if err != nil {
+			return true
+		}
+	}
+	return false
 }
