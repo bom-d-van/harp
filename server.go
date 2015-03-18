@@ -44,7 +44,7 @@ func (s Server) upload(info string) {
 				fmt.Printf("%s uploaded: %s\n", s, osrc)
 				wg.Done()
 			}()
-			dst := fmt.Sprintf("app@%s:harp/%s/files/%s", s.Host, appName, strings.Replace(src, "/", "_", -1))
+			dst := fmt.Sprintf("%s@%s:harp/%s/files/%s", s.User, s.Host, appName, strings.Replace(src, "/", "_", -1))
 			for _, path := range GoPaths {
 				src = filepath.Join(path, "src", osrc)
 				if fi, err := os.Stat(src); err != nil {
@@ -75,7 +75,10 @@ func (s Server) upload(info string) {
 			wg.Done()
 		}()
 		fmt.Printf("%s uploading: binary %s\n", s, appName)
-		dst := fmt.Sprintf("app@%s:harp/%[2]s/%[2]s", s.Host, appName)
+		dst := fmt.Sprintf("%s@%s:harp/%s/%s", s.User, s.Host, appName, appName)
+		if debugf {
+			fmt.Println("rsync", "-az", "--delete", "-e", ssh, "tmp/"+appName, dst)
+		}
 		output, err := exec.Command("rsync", "-az", "--delete", "-e", ssh, "tmp/"+appName, dst).CombinedOutput()
 		if err != nil {
 			exitf("failed to sync binary %s: %s: %s", appName, err, string(output))
@@ -163,7 +166,7 @@ fi
 touch %[2]s
 `, pid, log, app.Name, app.KillSig)
 
-	envs := "GOPATH=" + s.GoPath
+	envs := "GOPATH=" + gopath
 	for k, v := range app.Envs {
 		envs += fmt.Sprintf(" %s=%s", k, v)
 	}
@@ -266,7 +269,7 @@ func (s *Server) initClient() {
 	}
 	auths := []ssh.AuthMethod{ssh.PublicKeys(signers...)}
 	config := &ssh.ClientConfig{
-		User: "app",
+		User: s.User,
 		Auth: auths,
 	}
 
