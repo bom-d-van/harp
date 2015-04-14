@@ -410,6 +410,7 @@ func initHarp() {
 	},
 	"servers": {
 		"prod": [{
+			"gopath": "/home/app",
 			"user": "app",
 			"host": "",
 			"envs": {},
