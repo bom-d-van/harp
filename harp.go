@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -132,6 +133,11 @@ func main() {
 	args := flag.Args()
 	if len(args) == 0 || help {
 		printUsage()
+		return
+	}
+
+	if args[0] == "init" {
+		initHarp()
 		return
 	}
 
@@ -373,4 +379,41 @@ serversLoop:
 	}
 
 	return targetServers
+}
+
+func initHarp() {
+	if _, err := os.Stat("harp.json"); err == nil {
+		println("harp.json exists")
+		os.Exit(1)
+	}
+	file, err := os.Create("harp.json")
+	if err != nil {
+		panic(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	gopath := filepath.Join(filepath.SplitList(os.Getenv("GOPATH"))[0], "src")
+	importpath := strings.Replace(wd, gopath+"/", "", 1)
+	file.WriteString(fmt.Sprintf(`{
+	"goos": "linux",
+	"goarch": "amd64",
+	"app": {
+		"name":       "app",
+		"importpath": "%s",
+		"envs": {},
+		"files":      [
+			"%s"
+		]
+	},
+	"servers": {
+		"prod": [{
+			"user": "app",
+			"host": "",
+			"envs": {},
+			"port": ":22"
+		}]
+	}
+}`, importpath, importpath))
 }
