@@ -125,26 +125,27 @@ var migrationScript = template.Must(template.New("").Parse(`set -e
 cd harp/{{$app}}
 tar mxf migrations.tar.gz
 cd {{.Path}}
+{{$gopath := .GoPath}}
 {{range .Migrations}}
 echo "running {{.Base}}"
-{{.Envs}} $HOME/harp/{{$app}}/migration/{{.Base}} {{.Args}}
+GOPATH="{{$gopath}}" {{.Envs}} $HOME/harp/{{$app}}/migration/{{.Base}} {{.Args}}
 {{end}}
 `))
 
 func (s Server) runMigration(migrations []Migration) {
 	// TODO: to refactor
-	var path = s.GoPath
-	if path == "" {
+	var gopath = s.GoPath
+	if gopath == "" {
 		session := s.getSession()
 		output, _ := session.CombinedOutput("echo $GOPATH")
 		session.Close()
-		path = strings.TrimSpace(string(output))
+		gopath = strings.TrimSpace(string(output))
 	}
-	if path == "" {
+	if gopath == "" {
 		session := s.getSession()
 		output, _ := session.CombinedOutput("echo $HOME")
 		session.Close()
-		path = strings.TrimSpace(string(output))
+		gopath = strings.TrimSpace(string(output))
 	}
 
 	session := s.getSession()
@@ -152,8 +153,9 @@ func (s Server) runMigration(migrations []Migration) {
 	err := migrationScript.Execute(&script, struct {
 		Migrations []Migration
 		Path       string
+		GoPath     string
 		App        string
-	}{Migrations: migrations, Path: path + "/src/" + cfg.App.ImportPath, App: cfg.App.Name})
+	}{Migrations: migrations, Path: gopath + "/src/" + cfg.App.ImportPath, GoPath: gopath, App: cfg.App.Name})
 	if err != nil {
 		exitf("failed to generate migration script: %s", err)
 	}
