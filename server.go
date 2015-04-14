@@ -15,7 +15,7 @@ import (
 )
 
 type Server struct {
-	Env    []string // key=value
+	Envs   map[string]string
 	GoPath string
 	LogDir string
 	PIDDir string
@@ -166,9 +166,12 @@ fi
 touch %[2]s
 `, pid, log, app.Name, app.KillSig)
 
-	envs := "GOPATH=" + gopath
+	envs := fmt.Sprintf(` %s="%s"`, "GOPATH", gopath)
 	for k, v := range app.Envs {
-		envs += fmt.Sprintf(" %s=%s", k, v)
+		envs += fmt.Sprintf(` %s="%s"`, k, v)
+	}
+	for k, v := range s.Envs {
+		envs += fmt.Sprintf(` %s="%s"`, k, v)
 	}
 	args := strings.Join(app.Args, " ")
 	afterRsync += fmt.Sprintf("cd %s/src/%s\n", gopath, app.ImportPath)
