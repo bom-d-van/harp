@@ -319,6 +319,7 @@ actions:
     info    Print build info of servers (e.g. harp -s prod info).
     log     Print real time logs of application (e.g. harp -s prod log).
     restart Restart application (e.g. harp -s prod restart).
+    init    Initialize a harp.json file.
 options:`)
 	flag.PrintDefaults()
 }
