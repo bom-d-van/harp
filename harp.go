@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -359,7 +360,12 @@ func retrieveServers() []*Server {
 	for _, set := range serverSets {
 		servers, ok := cfg.Servers[set]
 		if !ok {
-			fmt.Println("server set doesn't exist:", set)
+			var existings []string
+			for s, _ := range cfg.Servers {
+				existings = append(existings, s)
+			}
+			sort.Sort(sort.StringSlice(existings))
+			fmt.Printf("server set doesn't exist: %s (%s)\n", set, strings.Join(existings, ", "))
 			os.Exit(1)
 		}
 		targetServers = append(targetServers, servers...)
