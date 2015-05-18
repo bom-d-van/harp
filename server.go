@@ -147,11 +147,13 @@ func (s Server) deploy() {
 		}
 
 		rsync += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
-		rsync += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
+		// rsync += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
+		rsync += fmt.Sprintf("rsync -az \"%s\" \"%s\"\n", src, dst)
 	}
 
 	rsync += fmt.Sprintf("cp harp/%s/harp-build.info %s/src/%s/\n", cfg.App.Name, gopath, cfg.App.ImportPath)
-	rsync += fmt.Sprintf("rsync -az --delete harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
+	// rsync += fmt.Sprintf("rsync -az --delete harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
+	rsync += fmt.Sprintf("rsync -az harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
 
 	app := cfg.App
 	log := fmt.Sprintf("$HOME/harp/%s/app.log", app.Name)
