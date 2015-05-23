@@ -291,7 +291,7 @@ func cmd(name string, args ...string) string {
 func build() {
 	app := cfg.App
 
-	var buildCmd = fmt.Sprintf("go build -a -v -o tmp/%s %s", app.Name, app.ImportPath)
+	buildCmd := fmt.Sprintf("go build -a -v -o tmp/%s %s", app.Name, app.ImportPath)
 	if app.BuildCmd != "" {
 		buildCmd = app.BuildCmd
 	}

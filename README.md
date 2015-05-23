@@ -2,6 +2,10 @@
 
 a go application deploy tool.
 
+## What harp does
+
+Harp
+
 ## usage
 
 ```sh
@@ -58,6 +62,21 @@ example:
 	}
 }
 ```
+
+### Build Override
+
+Add `BuildCmd` option in `App` as bellow:
+
+```
+"App": {
+	"Name":       "app",
+	"BuildCmd":   "docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/local/go/bin/go build -o path/to/app/tmp/app project/import/path'"
+}
+```
+
+Build override is useful doing cross compilation for cgo-involved projects, e.g. using Mac OS X building Linux binaries by docker or virtual box etc.
+
+Note: harp expects your build output appear in directory `tmp/{{app name}}` in your current working path.
 
 ### Script Override
 
