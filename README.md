@@ -4,7 +4,9 @@ a go application deploy tool.
 
 ## What harp does
 
-Harp
+Harp simply builds your application and upload it to your server. It brings you a complete solution for deploying common applications. It syncs, restarts, kills, and deploys your applications.
+
+The best way to learn what harp does and helps to use it. (In test directory, there are docker files and harp configurations you can play with)
 
 ## usage
 
@@ -39,8 +41,8 @@ example:
 
 ```json
 {
-	"GOOS": "linux",
-	"GOARCH": "amd64",
+	"GOOS": "linux",   // for go build
+	"GOARCH": "amd64", // for go build
 	"App": {
 		"Name":       "app",
 		"ImportPath": "github.com/bom-d-van/harp/test",
@@ -74,9 +76,9 @@ Add `BuildCmd` option in `App` as bellow:
 }
 ```
 
-Build override is useful doing cross compilation for cgo-involved projects, e.g. using Mac OS X building Linux binaries by docker or virtual box etc.
+Build override is useful doing cross compilation for cgo-involved projects, e.g. using Mac OS X building Linux binaries by docker or any other tools etc.
 
-Note: harp expects your build output appear in directory `tmp/{{app name}}` in your current working path.
+Note: harp expects build output appears in directory `tmp/{{app name}}` where you evoke harp command (i.e. pwd).
 
 ### Script Override
 
