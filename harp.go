@@ -69,7 +69,8 @@ type App struct {
 	KillSig string
 
 	// TODO: could override default deploy script for out-of-band deploy
-	DeployScript string
+	DeployScript  string
+	RestartScript string
 }
 
 var (

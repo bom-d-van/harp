@@ -108,24 +108,15 @@ func (s Server) deploy() {
 		println("deplying", s.String())
 	}
 
-	var (
-		// logs                           []string
-		beforeRsync, rsync, afterRsync string
-	)
-
-	beforeRsync += "set -e\n"
-
-	rsync = s.syncFiles()
-	afterRsync = s.restartScript()
-
 	scriptTmpl := s.retrieveDeployScript()
-	var buf bytes.Buffer
-	err := scriptTmpl.Execute(&buf, map[string]interface{}{
+	scriptData := map[string]interface{}{
 		"App":           cfg.App,
 		"Server":        s,
-		"SyncFiles":     rsync,
-		"RestartServer": afterRsync,
-	})
+		"SyncFiles":     s.syncFiles(),
+		"RestartServer": s.restartScript(),
+	}
+	var buf bytes.Buffer
+	err := scriptTmpl.Execute(&buf, scriptData)
 	if err != nil {
 		exitf(err.Error())
 	}
@@ -143,7 +134,7 @@ func (s Server) deploy() {
 	}
 
 	// TODO: save scripts(s) for kill app
-	s.saveRestartScript(beforeRsync + afterRsync)
+	s.saveRestartScript(scriptData)
 }
 
 func (s Server) syncFiles() (rsync string) {
@@ -209,7 +200,7 @@ touch %[2]s
 	afterRsync += fmt.Sprintf("cd %s/src/%s\n", gopath, app.ImportPath)
 	afterRsync += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, gopath, app.Name, args, log)
 	afterRsync += fmt.Sprintf("echo $! > %s\n", pid)
-	afterRsync += "cd $HOME\n"
+	afterRsync += "cd $HOME"
 	return
 }
 
@@ -234,7 +225,14 @@ const defaultDeployScript = `set -e
 {{.RestartServer}}
 `
 
-func (s Server) saveRestartScript(script string) {
+func (s Server) saveRestartScript(scriptData map[string]interface{}) {
+	tmpl := s.retrieveRestartScript()
+	var buf bytes.Buffer
+	err := tmpl.Execute(&buf, scriptData)
+	if err != nil {
+		exitf(err.Error())
+	}
+	script := buf.String()
 	session := s.getSession()
 	defer session.Close()
 	cmd := fmt.Sprintf(`cat <<EOF > harp/%s/restart.sh
@@ -248,6 +246,26 @@ chmod +x harp/%s/restart.sh
 		exitf("failed to save restart script on %s: %s: %s", s, err, string(output))
 	}
 }
+
+func (s Server) retrieveRestartScript() *template.Template {
+	script := defaultRestartScript
+	if cfg.App.RestartScript != "" {
+		cont, err := ioutil.ReadFile(cfg.App.RestartScript)
+		if err != nil {
+			exitf(err.Error())
+		}
+		script = string(cont)
+	}
+	tmpl, err := template.New("").Parse(script)
+	if err != nil {
+		exitf(err.Error())
+	}
+	return tmpl
+}
+
+const defaultRestartScript = `set -e
+{{.RestartServer}}
+`
 
 func (s Server) getGoPath() string {
 	var path = s.GoPath
