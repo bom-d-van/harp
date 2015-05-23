@@ -1,0 +1,24 @@
+{
+	"GOOS": "linux",
+	"GOARCH": "amd64",
+	"App": {
+		"Name":       "app",
+		"ImportPath": "github.com/bom-d-van/harp/test",
+		"DeployScript": "test/deploy.sh",
+		"Files":      [
+			"github.com/bom-d-van/harp/test/files",
+			"github.com/bom-d-van/harp/test/file"
+		]
+	},
+	"Servers": {
+		"prod": [{
+			"User": "app",
+			"Host": "192.168.59.103",
+			"Port": ":49153"
+		}, {
+			"User": "app",
+			"Host": "192.168.59.103",
+			"Port": ":49154"
+		}]
+	}
+}

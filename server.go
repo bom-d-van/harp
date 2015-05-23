@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"text/template"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -107,23 +109,45 @@ func (s Server) deploy() {
 	}
 
 	var (
-		logs                           []string
+		// logs                           []string
 		beforeRsync, rsync, afterRsync string
 	)
 
 	beforeRsync += "set -e\n"
 
-	if cfg.Hooks.Deploy.Before != "" {
-		before, err := ioutil.ReadFile(cfg.Hooks.Deploy.Before)
-		if err != nil {
-			exitf("failed to read deploy before hook script: %s", err)
-		}
-		beforeRsync += string(before)
-		beforeRsync += "\n"
+	rsync = s.syncFiles()
+	afterRsync = s.restartScript()
+
+	scriptTmpl := s.retrieveDeployScript()
+	var buf bytes.Buffer
+	err := scriptTmpl.Execute(&buf, map[string]string{
+		"App":           cfg.App,
+		"Server":        s,
+		"SyncFiles":     rsync,
+		"RestartServer": afterRsync,
+	})
+	if err != nil {
+		exitf(err.Error())
+	}
+	script := buf.String()
+	if debugf {
+		fmt.Printf("%s", script)
 	}
 
-	gopath := s.getGoPath()
+	// var output []byte
+	session := s.getSession()
+	defer session.Close()
+	output, err := session.CombinedOutput(script)
+	if err != nil {
+		exitf("failed to exec %s: %s %s", script, string(output), err)
+	}
 
+	// TODO: save scripts(s) for kill app
+	s.saveRestartScript(beforeRsync + afterRsync)
+}
+
+func (s Server) syncFiles() (rsync string) {
+	gopath := s.getGoPath()
 	rsync += fmt.Sprintf("mkdir -p %s/bin %s/src\n", gopath, gopath)
 
 	// TODO: handle callback error
@@ -155,10 +179,16 @@ func (s Server) deploy() {
 	// rsync += fmt.Sprintf("rsync -az --delete harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
 	rsync += fmt.Sprintf("rsync -az harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
 
+	return rsync
+}
+
+func (s Server) restartScript() (afterRsync string) {
+	// var logs []string
+	gopath := s.getGoPath()
 	app := cfg.App
 	log := fmt.Sprintf("$HOME/harp/%s/app.log", app.Name)
 	pid := fmt.Sprintf("$HOME/harp/%s/app.pid", app.Name)
-	logs = append(logs, log)
+	// logs = append(logs, log)
 	afterRsync += fmt.Sprintf(`if [[ -f %[1]s ]]; then
 	target=$(cat %[1]s);
 	if ps -p $target > /dev/null; then
@@ -179,32 +209,30 @@ touch %[2]s
 	afterRsync += fmt.Sprintf("cd %s/src/%s\n", gopath, app.ImportPath)
 	afterRsync += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, gopath, app.Name, args, log)
 	afterRsync += fmt.Sprintf("echo $! > %s\n", pid)
-
-	if cfg.Hooks.Deploy.After != "" {
-		after, err := ioutil.ReadFile(cfg.Hooks.Deploy.After)
-		if err != nil {
-			exitf("failed to read deploy after hook script: %s", err)
-		}
-		afterRsync += string(after)
-		afterRsync += "\n"
-	}
-
-	script := beforeRsync + rsync + afterRsync
-	if debugf {
-		fmt.Printf("%s", script)
-	}
-
-	var output []byte
-	session := s.getSession()
-	defer session.Close()
-	output, err := session.CombinedOutput(script)
-	if err != nil {
-		exitf("failed to exec %s: %s %s", script, string(output), err)
-	}
-
-	// TODO: save scripts(s) for kill app
-	s.saveRestartScript(beforeRsync + afterRsync)
+	afterRsync += "cd $HOME\n"
+	return
 }
+
+func (s Server) retrieveDeployScript() *template.Template {
+	script := defaultDeployScript
+	if cfg.App.DeployScript != "" {
+		cont, err := ioutil.ReadFile(cfg.App.DeployScript)
+		if err != nil {
+			exitf(err.Error())
+		}
+		script = string(cont)
+	}
+	tmpl, err := template.New("").Parse(script)
+	if err != nil {
+		exitf(err.Error())
+	}
+	return tmpl
+}
+
+const defaultDeployScript = `set -e
+{{.SyncFiles}}
+{{.RestartServer}}
+`
 
 func (s Server) saveRestartScript(script string) {
 	session := s.getSession()

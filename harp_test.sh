@@ -20,7 +20,24 @@ server2=harp_test_server2
 docker run -P -p 49153:22 -d -v ~/.ssh/id_rsa.pub:/home/app/.ssh/authorized_keys --name $server1 sshd
 docker run -P -p 49154:22 -d -v ~/.ssh/id_rsa.pub:/home/app/.ssh/authorized_keys --name $server2 sshd
 
+
+echo ====================
+echo tmp/harp -c test/harp.json -s prod deploy
 tmp/harp -c test/harp.json -s prod deploy
+
+echo ====================
+echo tmp/harp -c test/harp.json -s prod deploy
+tmp/harp -c test/harp2.json -s prod deploy
+ssh app@192.168.59.103 -p 49153 -- cat test.log
+
+echo ====================
+echo tmp/harp -c test/harp.json -server app@192.168.59.103:49153 deploy
 tmp/harp -c test/harp.json -server app@192.168.59.103:49153 deploy
+
+echo ====================
+echo tmp/harp -c test/harp.json -server app@192.168.59.103:49153 migrate "AppEnv=prod test/migration.go -arg1 val1 -arg2 val2" test/migration2.go
 tmp/harp -c test/harp.json -server app@192.168.59.103:49153 migrate "AppEnv=prod test/migration.go -arg1 val1 -arg2 val2" test/migration2.go
+
+echo ====================
+echo tmp/harp -c test/harp.json -s prod migrate github.com/bom-d-van/harp/test/migration3
 tmp/harp -c test/harp.json -s prod migrate github.com/bom-d-van/harp/test/migration3
