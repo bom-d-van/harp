@@ -198,6 +198,7 @@ func retrieveMigrations(args []string) (ms []Migration) {
 		var migration Migration
 		parts := strings.Split(arg, " ")
 		for index, part := range parts {
+			part = strings.TrimSpace(part)
 			if strings.Contains(part, "=") {
 				migration.Envs += part + " "
 			} else if doesFileExist(part) {
@@ -213,7 +214,7 @@ func retrieveMigrations(args []string) (ms []Migration) {
 		}
 
 		if migration.File == "" {
-			exitf("can't retrieve migration file (migration file path DOES NOT allow SPACES)")
+			exitf("can't retrieve migration file\n(migration file path DOES NOT allow SPACES)")
 		}
 
 		migration.Envs = strings.Trim(migration.Envs, " ")
@@ -231,7 +232,7 @@ func doesFileExist(file string) bool {
 
 	for _, path := range GoPaths {
 		_, err = os.Stat(filepath.Join(path, "src", file))
-		if err != nil {
+		if err == nil {
 			return true
 		}
 	}
