@@ -120,7 +120,7 @@ func (s Server) deploy() {
 
 	scriptTmpl := s.retrieveDeployScript()
 	var buf bytes.Buffer
-	err := scriptTmpl.Execute(&buf, map[string]string{
+	err := scriptTmpl.Execute(&buf, map[string]interface{}{
 		"App":           cfg.App,
 		"Server":        s,
 		"SyncFiles":     rsync,
