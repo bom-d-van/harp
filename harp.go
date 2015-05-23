@@ -127,7 +127,7 @@ func main() {
 	flag.Parse()
 
 	if versionf {
-		fmt.Printf("0.1.%d\n", version)
+		fmt.Printf("0.2.%d\n", version)
 		return
 	}
 
