@@ -108,19 +108,7 @@ func (s Server) deploy() {
 		println("deplying", s.String())
 	}
 
-	scriptTmpl := s.retrieveDeployScript()
-	scriptData := map[string]interface{}{
-		"App":           cfg.App,
-		"Server":        s,
-		"SyncFiles":     s.syncFiles(),
-		"RestartServer": s.restartScript(),
-	}
-	var buf bytes.Buffer
-	err := scriptTmpl.Execute(&buf, scriptData)
-	if err != nil {
-		exitf(err.Error())
-	}
-	script := buf.String()
+	script := s.retrieveDeployScript()
 	if debugf {
 		fmt.Printf("%s", script)
 	}
@@ -134,7 +122,16 @@ func (s Server) deploy() {
 	}
 
 	// TODO: save scripts(s) for kill app
-	s.saveRestartScript(scriptData)
+	s.saveRestartScript()
+}
+
+func (s Server) scriptData() interface{} {
+	return map[string]interface{}{
+		"App":           cfg.App,
+		"Server":        s,
+		"SyncFiles":     s.syncFiles(),
+		"RestartServer": s.restartScript(),
+	}
 }
 
 func (s Server) syncFiles() (rsync string) {
@@ -204,7 +201,7 @@ touch %[2]s
 	return
 }
 
-func (s Server) retrieveDeployScript() *template.Template {
+func (s Server) retrieveDeployScript() string {
 	script := defaultDeployScript
 	if cfg.App.DeployScript != "" {
 		cont, err := ioutil.ReadFile(cfg.App.DeployScript)
@@ -217,7 +214,13 @@ func (s Server) retrieveDeployScript() *template.Template {
 	if err != nil {
 		exitf(err.Error())
 	}
-	return tmpl
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, s.scriptData()); err != nil {
+		exitf(err.Error())
+	}
+
+	return buf.String()
 }
 
 const defaultDeployScript = `set -e
@@ -225,14 +228,8 @@ const defaultDeployScript = `set -e
 {{.RestartServer}}
 `
 
-func (s Server) saveRestartScript(scriptData map[string]interface{}) {
-	tmpl := s.retrieveRestartScript()
-	var buf bytes.Buffer
-	err := tmpl.Execute(&buf, scriptData)
-	if err != nil {
-		exitf(err.Error())
-	}
-	script := buf.String()
+func (s Server) saveRestartScript() {
+	script := s.retrieveRestartScript()
 	session := s.getSession()
 	defer session.Close()
 	cmd := fmt.Sprintf(`cat <<EOF > harp/%s/restart.sh
@@ -247,7 +244,7 @@ chmod +x harp/%s/restart.sh
 	}
 }
 
-func (s Server) retrieveRestartScript() *template.Template {
+func (s Server) retrieveRestartScript() string {
 	script := defaultRestartScript
 	if cfg.App.RestartScript != "" {
 		cont, err := ioutil.ReadFile(cfg.App.RestartScript)
@@ -260,7 +257,13 @@ func (s Server) retrieveRestartScript() *template.Template {
 	if err != nil {
 		exitf(err.Error())
 	}
-	return tmpl
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, s.scriptData()); err != nil {
+		exitf(err.Error())
+	}
+
+	return buf.String()
 }
 
 const defaultRestartScript = `set -e

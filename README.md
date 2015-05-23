@@ -58,3 +58,42 @@ example:
 	}
 }
 ```
+
+### Script Override
+
+harp supports you to override its default deploy script. Add configuration like bellow:
+
+```
+"App": {
+	"Name":         "app",
+	"DeployScript": "path-to-your-script-template"
+},
+```
+
+The script could be a `text/template.Template`, into which harp pass a data as bellow:
+
+```
+map[string]interface{}{
+	"App":           harp.App,
+	"Server":        harp.Server,
+	"SyncFiles":     syncFilesScript,
+	"RestartServer": restartScript,
+}
+```
+
+A default deploy script is:
+
+```
+set -e
+{{.SyncFiles}}
+{{.RestartServer}}
+```
+
+Similarly, restart script could be override too. And its default template is:
+
+```
+set -e
+{{.RestartServer}}
+```
+
+You can inspect your script by evoking command: `harp -s prod inspect deploy` or `harp -s prod inspect restart`.

@@ -162,6 +162,8 @@ func main() {
 		noBuild = true
 		noUpload = true
 		deploy(servers)
+	case "inspect":
+		inspectScript(servers, args[1])
 	}
 
 	if toTailLog {
@@ -425,4 +427,17 @@ func initHarp() {
 		}]
 	}
 }`, importpath, importpath))
+}
+
+func inspectScript(servers []*Server, name string) {
+	for _, s := range servers {
+		fmt.Println("# ====================================")
+		fmt.Println("#", s.String())
+		switch name {
+		case "deploy":
+			fmt.Println(s.retrieveDeployScript())
+		case "restart":
+			fmt.Println(s.retrieveRestartScript())
+		}
+	}
 }
