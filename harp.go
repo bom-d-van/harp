@@ -147,6 +147,8 @@ func main() {
 	servers := retrieveServers()
 
 	switch args[0] {
+	case "kill":
+		// TODO
 	case "deploy":
 		deploy(servers)
 	case "migrate":
@@ -186,12 +188,12 @@ func deploy(servers []*Server) {
 		go func(server *Server) {
 			defer wg.Done()
 			if !noUpload {
-				fmt.Printf("uploading: [%s] %s\n", server.set, server)
+				fmt.Printf("uploading: [%s] %s\n", server.Set, server)
 				server.upload(info)
 			}
 
 			if !noDeploy {
-				fmt.Printf("deploying: [%s] %s\n", server.set, server)
+				fmt.Printf("deploying: [%s] %s\n", server.Set, server)
 				server.deploy()
 			}
 		}(server)
@@ -242,7 +244,7 @@ func parseCfg(configPath string) (cfg Config) {
 
 	for k, set := range cfg.Servers {
 		for _, s := range set {
-			s.set = k
+			s.Set = k
 			if s.Port == "" {
 				s.Port = ":22"
 			}

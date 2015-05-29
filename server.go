@@ -26,7 +26,7 @@ type Server struct {
 	Host string
 	Port string
 
-	set string
+	Set string
 
 	client *ssh.Client
 }

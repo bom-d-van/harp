@@ -100,6 +100,38 @@ map[string]interface{}{
 	"SyncFiles":     syncFilesScript,
 	"RestartServer": restartScript,
 }
+
+type App struct {
+	Name       string
+	ImportPath string
+	Files      []string
+
+	Args []string
+	Envs map[string]string
+
+	BuildCmd string
+
+	KillSig string
+
+	// TODO: could override default deploy script for out-of-band deploy
+	DeployScript  string
+	RestartScript string
+}
+
+type Server struct {
+	Envs   map[string]string
+	GoPath string
+	LogDir string
+	PIDDir string
+
+	User string
+	Host string
+	Port string
+
+	Set string
+
+	client *ssh.Client
+}
 ```
 
 A default deploy script is:
