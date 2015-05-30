@@ -174,7 +174,7 @@ func main() {
 }
 
 func deploy(servers []*Server) {
-	info := getInfo()
+	info := getBuildLog()
 	if !noBuild {
 		fmt.Println("building")
 		build()
@@ -254,7 +254,7 @@ func parseCfg(configPath string) (cfg Config) {
 	return
 }
 
-func getInfo() string {
+func getBuildLog() string {
 	var info string
 	info += "Go Version: " + cmd("go", "version")
 	if cfg.GOOS != "" {
