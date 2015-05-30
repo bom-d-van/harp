@@ -18,6 +18,7 @@ import (
 
 type Server struct {
 	Envs   map[string]string
+	Home   string // TODO
 	GoPath string
 	LogDir string
 	PIDDir string
@@ -26,7 +27,7 @@ type Server struct {
 	Host string
 	Port string
 
-	Set string
+	Set string // aka, Type
 
 	client *ssh.Client
 }
