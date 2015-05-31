@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 )
 
@@ -149,6 +151,7 @@ func main() {
 	switch args[0] {
 	case "kill":
 		// TODO
+		kill(servers)
 	case "deploy":
 		deploy(servers)
 	case "migrate":
@@ -205,7 +208,6 @@ func deploy(servers []*Server) {
 // TODO: use buffer
 func inspect(servers []*Server) {
 	var wg sync.WaitGroup
-	// for _, set := range servers {
 	for _, serv := range servers {
 		wg.Add(1)
 		go func(serv *Server) {
@@ -219,7 +221,6 @@ func inspect(servers []*Server) {
 			fmt.Println(string(output))
 		}(serv)
 	}
-	// }
 	wg.Wait()
 }
 
@@ -322,6 +323,7 @@ usage:
 actions:
     deploy  Deploy your application (e.g. harp -s prod deploy).
     migrate Run migrations on server (e.g. harp -s prod migrate path/to/my_migration.go).
+    kill    Kill server.
     info    Print build info of servers (e.g. harp -s prod info).
     log     Print real time logs of application (e.g. harp -s prod log).
     restart Restart application (e.g. harp -s prod restart).
@@ -440,6 +442,45 @@ func inspectScript(servers []*Server, name string) {
 			fmt.Println(s.retrieveDeployScript())
 		case "restart":
 			fmt.Println(s.retrieveRestartScript())
+		case "kill":
+			fmt.Println(s.retrieveKillScript())
 		}
 	}
 }
+
+func kill(servers []*Server) {
+	var wg sync.WaitGroup
+	for _, server := range servers {
+		wg.Add(1)
+		go func(s *Server) {
+			defer func() { wg.Done() }()
+
+			session := s.getSession()
+			defer session.Close()
+			output, err := session.CombinedOutput(s.retrieveKillScript())
+			if err != nil {
+				exitf("failed to exec %s: %s %s", script, string(output), err)
+			}
+		}(server)
+	}
+	wg.Wait()
+}
+
+func (s *Server) retrieveKillScript() string {
+	var buf bytes.Buffer
+	if err := killScriptTmpl.Execute(&buf, cfg); err != nil {
+		exitf(err.Error())
+	}
+	if debugf {
+		fmt.Println(buf.String())
+	}
+	return buf.String()
+}
+
+var killScriptTmpl = template.Must(template.New("").Parse(`set -e
+if [[ -f $HOME/harp/{{.App.Name}}/app.pid ]]; then
+	target=$(cat $HOME/harp/{{.App.Name}}/app.pid);
+	if ps -p $target > /dev/null; then
+		kill -KILL $target; > /dev/null 2>&1;
+	fi
+fi`))
