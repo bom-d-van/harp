@@ -62,7 +62,7 @@ examples:
 
 example:
 
-```json
+```js
 {
 	"GOOS": "linux",   // for go build
 	"GOARCH": "amd64", // for go build
