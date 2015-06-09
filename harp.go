@@ -146,7 +146,11 @@ func main() {
 	}
 
 	cfg = parseCfg(configPath)
-	servers := retrieveServers()
+
+	var servers []*Server
+	if args[0] != "cross-compile" && args[0] != "xc" {
+		servers = retrieveServers()
+	}
 
 	switch args[0] {
 	case "kill":
@@ -154,7 +158,7 @@ func main() {
 		kill(servers)
 	case "deploy":
 		deploy(servers)
-	case "migrate":
+	case "migrate", "run":
 		// TODO: could specify to run on all servers
 		migrations := retrieveMigrations(args[1:])
 		// var server = cfg.Servers[serverSets[0]][0]
@@ -169,6 +173,8 @@ func main() {
 		deploy(servers)
 	case "inspect":
 		inspectScript(servers, args[1])
+	case "cross-compile", "xc":
+		initXC()
 	}
 
 	if toTailLog {
@@ -320,16 +326,33 @@ func printUsage() {
 	fmt.Println(`harp is a go application deployment tool.
 usage:
     harp [options] [action]
+
 actions:
     deploy  Deploy your application (e.g. harp -s prod deploy).
-    migrate Run migrations on server (e.g. harp -s prod migrate path/to/my_migration.go).
+    run     Run migrations on server (e.g. harp -s prod migrate path/to/my_migration.go).
     kill    Kill server.
     info    Print build info of servers (e.g. harp -s prod info).
     log     Print real time logs of application (e.g. harp -s prod log).
     restart Restart application (e.g. harp -s prod restart).
     init    Initialize a harp.json file.
+
 options:`)
 	flag.PrintDefaults()
+
+	fmt.Println(`
+examples:
+    Deploy:
+        harp -s prod -log deploy
+
+    Compile and run a go package or file in server/Migration:
+        Simple:
+            harp -server app@192.168.59.103:49153 run migration.go
+
+        With env and arguments (behold the quotes):
+            harp -server app@192.168.59.103:49153 run "Env1=val Env2=val migration2.go -arg1 val1"
+
+        Multiple migrations (behold the quotes):
+            harp -server app@192.168.59.103:49153 run migration.go "Env1=val migration2.go -arg1 val1"`)
 }
 
 func retrieveServers() []*Server {
@@ -484,3 +507,17 @@ if [[ -f $HOME/harp/{{.App.Name}}/app.pid ]]; then
 		kill -KILL $target; > /dev/null 2>&1;
 	fi
 fi`))
+
+func initXC() {
+	goroot := strings.TrimSpace(cmd("go", "env", "GOROOT"))
+	cmd := exec.Command("./make.bash")
+	cmd.Dir = filepath.Join(goroot, "src")
+	cmd.Env = append(os.Environ(), "GOOS="+cfg.GOOS, "GOARCH="+cfg.GOARCH)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		exitf("failed to init cross compilation (GOOS=%s, GOARCH=%s): %s", cfg.GOOS, cfg.GOARCH, err)
+	}
+}
