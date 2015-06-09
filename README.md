@@ -8,7 +8,7 @@ Harp simply builds your application and upload it to your server. It brings you 
 
 The best way to learn what harp does and helps is to use it. (In test directory, there are docker files and harp configurations you can play with)
 
-## usage
+## Usage
 
 ```sh
 harp is a go application deployment tool.
@@ -58,7 +58,7 @@ examples:
             harp -server app@192.168.59.103:49153 run migration.go "Env1=val migration2.go -arg1 val1"
 ```
 
-## configuration
+## Configuration
 
 example:
 
