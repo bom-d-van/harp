@@ -14,25 +14,48 @@ The best way to learn what harp does and helps to use it. (In test directory, th
 harp is a go application deployment tool.
 usage:
     harp [options] [action]
+
 actions:
     deploy  Deploy your application (e.g. harp -s prod deploy).
-    migrate Run migrations on server (e.g. harp -s prod -m migration/reset_info.go migrate).
+    run     Run migrations on server (e.g. harp -s prod migrate path/to/my_migration.go).
+    kill    Kill server.
     info    Print build info of servers (e.g. harp -s prod info).
     log     Print real time logs of application (e.g. harp -s prod log).
     restart Restart application (e.g. harp -s prod restart).
+    init    Initialize a harp.json file.
+
 options:
+  -all=false: execute action on all server
   -c="harp.json": config file path
   -debug=false: print debug info
   -h=false: print helps
   -help=false: print helps
+  -log=false: tail log after deploy
   -m="": specify migrations to run on server, multiple migrations are split by comma
   -nb=false: no build
   -nd=false: no deploy
+  -nf=false: no files
   -nu=false: no upload
   -s="": specify server sets to deploy, multiple sets are split by comma
   -scripts="": scripts to build and run on server
+  -server="": specify servers to deploy, multiple servers are split by comma
   -server-set="": specify server sets to deploy, multiple sets are split by comma
-  -v=false: verbose
+  -v=false: print version num
+  -version=false: print version num
+
+examples:
+    Deploy:
+        harp -s prod -log deploy
+
+    Compile and run a go package or file in server/Migration:
+        Simple:
+            harp -server app@192.168.59.103:49153 run migration.go
+
+        With env and arguments (behold the quotes):
+            harp -server app@192.168.59.103:49153 run "Env1=val Env2=val migration2.go -arg1 val1"
+
+        Multiple migrations (behold the quotes):
+            harp -server app@192.168.59.103:49153 run migration.go "Env1=val migration2.go -arg1 val1"
 ```
 
 ## configuration
@@ -58,11 +81,33 @@ example:
 			"Port": ":49155"
 		}, {
 			"User": "app",
-			"Host": "192.168.59.103",
+			"Host": "192.168.59.104",
 			"Port": ":49156"
+		}],
+
+		"dev": [{
+			"User": "app",
+			"Host": "192.168.59.102",
+			"Port": ":49155"
 		}]
 	}
 }
+```
+
+### How to specify server or server sets:
+
+Using the configuration above as example, server set means the key in `Servers` object value, i.e. `prod`, `dev`.
+While server is elemnt in server set arrays, you can specify it by `{User}@{Host}{Port}`.
+
+```sh
+# deploy prod servers
+harp -s prod deploy
+
+# deploy dev servers
+harp -s dev deploy
+
+# deploy only one prod server:
+harp -server app@192.168.59.102:49155 deploy
 ```
 
 ### Build Override
@@ -150,3 +195,33 @@ set -e
 ```
 
 You can inspect your script by evoking command: `harp -s prod inspect deploy` or `harp -s prod inspect restart`.
+
+### Migration / Run a go package/file on remote server
+
+You can specify server or server sets on which your migration need to be executed.
+
+Simple:
+
+```
+harp -server app@192.168.59.103:49153 run migration.go
+```
+
+With env and arguments:
+
+```
+harp -server app@192.168.59.103:49153 run "AppEnv=prod migration2.go -arg1 val1 -arg2 val2"
+```
+
+Multiple migrations:
+
+```
+harp -server app@192.168.59.103:49153 run migration.go "AppEnv=prod migration2.go -arg1 val1 -arg2 val2"
+```
+
+### Initialize go cross compilation
+
+If you need to initialize cross compilation environment, harp has a simple commend to help you:
+
+```
+harp xc
+```
