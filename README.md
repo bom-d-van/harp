@@ -6,7 +6,7 @@ a go application deploy tool.
 
 Harp simply builds your application and upload it to your server. It brings you a complete solution for deploying common applications. It syncs, restarts, kills, and deploys your applications.
 
-The best way to learn what harp does and helps to use it. (In test directory, there are docker files and harp configurations you can play with)
+The best way to learn what harp does and helps is to use it. (In test directory, there are docker files and harp configurations you can play with)
 
 ## usage
 
