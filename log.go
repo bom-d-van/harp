@@ -8,10 +8,10 @@ import (
 )
 
 // TODO: put logs from different servers into a buffer and print one at at time
-func tailLog(servers []*Server) {
-	// for _, set := range serverSets {
+func tailLog(servers []*Server, beginLineNum int) {
 	for _, serv := range servers {
 		go func(serv *Server) {
+			serv.initPathes()
 			session := serv.getSession()
 
 			// TODO: refactor
@@ -30,12 +30,11 @@ func tailLog(servers []*Server) {
 				go io.Copy(os.Stderr, r)
 			}
 
-			if err := session.Start(fmt.Sprintf("tail -f -n 20 harp/%s/app.log", cfg.App.Name)); err != nil {
+			if err := session.Start(fmt.Sprintf("tail -f -n %d %s/harp/%s/app.log", beginLineNum, serv.Home, cfg.App.Name)); err != nil {
 				exitf("tail -f harp/%s/app.log error: %s", cfg.App, err)
 			}
 		}(serv)
 	}
-	// }
 
 	var wg sync.WaitGroup
 	wg.Add(1)

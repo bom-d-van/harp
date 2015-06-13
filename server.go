@@ -17,8 +17,10 @@ import (
 )
 
 type Server struct {
+	ID string // TODO
+
 	Envs   map[string]string
-	Home   string // TODO
+	Home   string
 	GoPath string
 	LogDir string
 	PIDDir string
@@ -32,7 +34,7 @@ type Server struct {
 	client *ssh.Client
 }
 
-func (s Server) upload(info string) {
+func (s *Server) upload(info string) {
 	s.initSetUp()
 
 	var wg sync.WaitGroup
@@ -104,7 +106,7 @@ func (s Server) upload(info string) {
 	wg.Wait()
 }
 
-func (s Server) deploy() {
+func (s *Server) deploy() {
 	if debugf {
 		println("deplying", s.String())
 	}
@@ -126,24 +128,25 @@ func (s Server) deploy() {
 	s.saveRestartScript()
 }
 
-func (s Server) scriptData() interface{} {
+func (s *Server) scriptData() interface{} {
 	return map[string]interface{}{
 		"App":           cfg.App,
 		"Server":        s,
-		"SyncFiles":     s.syncFiles(),
+		"SyncFiles":     s.syncFilesScript(),
 		"RestartServer": s.restartScript(),
 	}
 }
 
-func (s Server) syncFiles() (rsync string) {
-	gopath := s.getGoPath()
-	rsync += fmt.Sprintf("mkdir -p %s/bin %s/src\n", gopath, gopath)
+func (s *Server) syncFilesScript() (script string) {
+	// gopath := s.getGoPath()
+	s.initPathes()
+	script += fmt.Sprintf("mkdir -p %s/bin %s/src\n", s.GoPath, s.GoPath)
 
 	// TODO: handle callback error
 	for _, dst := range cfg.App.Files {
 		src := fmt.Sprintf("harp/%s/files/%s", cfg.App.Name, strings.Replace(dst, "/", "_", -1))
 		odst := dst
-		dst = fmt.Sprintf("%s/src/%s", gopath, dst)
+		dst = fmt.Sprintf("%s/src/%s", s.GoPath, dst)
 
 		var hasErr bool
 		for _, path := range GoPaths {
@@ -159,26 +162,25 @@ func (s Server) syncFiles() (rsync string) {
 			exitf("failed to find %s from %s", odst, GoPaths)
 		}
 
-		rsync += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
-		// rsync += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
-		rsync += fmt.Sprintf("rsync -az \"%s\" \"%s\"\n", src, dst)
+		script += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
+		// script += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
+		script += fmt.Sprintf("rsync -az \"%s\" \"%s\"\n", src, dst)
 	}
 
-	rsync += fmt.Sprintf("cp harp/%s/harp-build.info %s/src/%s/\n", cfg.App.Name, gopath, cfg.App.ImportPath)
-	// rsync += fmt.Sprintf("rsync -az --delete harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
-	rsync += fmt.Sprintf("rsync -az harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, gopath)
+	script += fmt.Sprintf("cp harp/%s/harp-build.info %s/src/%s/\n", cfg.App.Name, s.GoPath, cfg.App.ImportPath)
+	// rsync += fmt.Sprintf("rsync -az --delete harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, s.GoPath)
+	script += fmt.Sprintf("rsync -az harp/%[1]s/%[1]s %s/bin/%[1]s\n", cfg.App.Name, s.GoPath)
 
-	return rsync
+	return
 }
 
-func (s Server) restartScript() (afterRsync string) {
-	// var logs []string
-	gopath := s.getGoPath()
+func (s *Server) restartScript() (script string) {
+	// gopath := s.getGoPath()
+	s.initPathes()
 	app := cfg.App
-	log := fmt.Sprintf("$HOME/harp/%s/app.log", app.Name)
-	pid := fmt.Sprintf("$HOME/harp/%s/app.pid", app.Name)
-	// logs = append(logs, log)
-	afterRsync += fmt.Sprintf(`if [[ -f %[1]s ]]; then
+	log := fmt.Sprintf("%s/harp/%s/app.log", s.Home, app.Name)
+	pid := fmt.Sprintf("%s/harp/%s/app.pid", s.Home, app.Name)
+	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
 	target=$(cat %[1]s);
 	if ps -p $target > /dev/null; then
 		kill -%[4]s $target; > /dev/null 2>&1;
@@ -187,7 +189,7 @@ fi
 touch %[2]s
 `, pid, log, app.Name, app.KillSig)
 
-	envs := fmt.Sprintf(` %s="%s"`, "GOPATH", gopath)
+	envs := fmt.Sprintf(`%s=%q`, "GOPATH", s.GoPath)
 	for k, v := range app.Envs {
 		envs += fmt.Sprintf(` %s="%s"`, k, v)
 	}
@@ -195,14 +197,14 @@ touch %[2]s
 		envs += fmt.Sprintf(` %s="%s"`, k, v)
 	}
 	args := strings.Join(app.Args, " ")
-	afterRsync += fmt.Sprintf("cd %s/src/%s\n", gopath, app.ImportPath)
-	afterRsync += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, gopath, app.Name, args, log)
-	afterRsync += fmt.Sprintf("echo $! > %s\n", pid)
-	afterRsync += "cd $HOME"
+	script += fmt.Sprintf("cd %s/src/%s\n", s.GoPath, app.ImportPath)
+	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, s.GoPath, app.Name, args, log)
+	script += fmt.Sprintf("echo $! > %s\n", pid)
+	script += "cd " + s.Home
 	return
 }
 
-func (s Server) retrieveDeployScript() string {
+func (s *Server) retrieveDeployScript() string {
 	script := defaultDeployScript
 	if cfg.App.DeployScript != "" {
 		cont, err := ioutil.ReadFile(cfg.App.DeployScript)
@@ -229,7 +231,7 @@ const defaultDeployScript = `set -e
 {{.RestartServer}}
 `
 
-func (s Server) saveRestartScript() {
+func (s *Server) saveRestartScript() {
 	script := s.retrieveRestartScript()
 	session := s.getSession()
 	defer session.Close()
@@ -271,28 +273,38 @@ const defaultRestartScript = `set -e
 {{.RestartServer}}
 `
 
-func (s Server) getGoPath() string {
-	var path = s.GoPath
-	if path == "" {
-		session := s.getSession()
-		output, err := session.CombinedOutput("echo $GOPATH")
-		if err != nil {
-			fmt.Printf("echo $GOPATH on %s error: %s\n", s, err)
-		}
-		session.Close()
-		path = strings.TrimSpace(string(output))
-	}
-	if path == "" {
+func (s *Server) initPathes() {
+	if s.Home == "" {
 		session := s.getSession()
 		output, err := session.CombinedOutput("echo $HOME")
 		if err != nil {
 			fmt.Printf("echo $HOME on %s error: %s\n", s, err)
 		}
 		session.Close()
-		path = strings.TrimSpace(string(output))
+		s.Home = strings.TrimSpace(string(output))
+	}
+	if s.Home == "" {
+		session := s.getSession()
+		output, err := session.CombinedOutput("pwd")
+		if err != nil {
+			fmt.Printf("pwd on %s error: %s\n", s, err)
+		}
+		session.Close()
+		s.Home = strings.TrimSpace(string(output))
 	}
 
-	return path
+	if s.GoPath == "" {
+		session := s.getSession()
+		output, err := session.CombinedOutput("echo $GOPATH")
+		if err != nil {
+			fmt.Printf("echo $GOPATH on %s error: %s\n", s, err)
+		}
+		session.Close()
+		s.GoPath = strings.TrimSpace(string(output))
+	}
+	if s.GoPath == "" {
+		s.GoPath = s.Home
+	}
 }
 
 func (s *Server) getSession() *ssh.Session {

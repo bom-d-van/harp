@@ -72,7 +72,7 @@ func bundleMigration(migrations []Migration) {
 	}
 }
 
-func (s Server) uploadMigration(migrations []Migration) {
+func (s *Server) uploadMigration(migrations []Migration) {
 	src, err := os.OpenFile("tmp/migrations.tar.gz", os.O_RDONLY, 0644)
 	if err != nil {
 		exitf("failed to open tmp/migrations.tar.gz: %s", err)
@@ -126,27 +126,16 @@ cd harp/{{$app}}
 tar mxf migrations.tar.gz
 cd {{.Path}}
 {{$gopath := .GoPath}}
+{{$home := .Home}}
 {{range .Migrations}}
 echo "running {{.Base}}"
-GOPATH="{{$gopath}}" {{.Envs}} $HOME/harp/{{$app}}/migration/{{.Base}} {{.Args}}
+GOPATH="{{$gopath}}" {{.Envs}} {{$home}}/harp/{{$app}}/migration/{{.Base}} {{.Args}}
 {{end}}
 `))
 
-func (s Server) runMigration(migrations []Migration) {
+func (s *Server) runMigration(migrations []Migration) {
 	// TODO: to refactor
-	var gopath = s.GoPath
-	if gopath == "" {
-		session := s.getSession()
-		output, _ := session.CombinedOutput("echo $GOPATH")
-		session.Close()
-		gopath = strings.TrimSpace(string(output))
-	}
-	if gopath == "" {
-		session := s.getSession()
-		output, _ := session.CombinedOutput("echo $HOME")
-		session.Close()
-		gopath = strings.TrimSpace(string(output))
-	}
+	s.initPathes()
 
 	session := s.getSession()
 	var script bytes.Buffer
@@ -155,7 +144,14 @@ func (s Server) runMigration(migrations []Migration) {
 		Path       string
 		GoPath     string
 		App        string
-	}{Migrations: migrations, Path: gopath + "/src/" + cfg.App.ImportPath, GoPath: gopath, App: cfg.App.Name})
+		Home       string
+	}{
+		Migrations: migrations,
+		Path:       s.GoPath + "/src/" + cfg.App.ImportPath,
+		GoPath:     s.GoPath,
+		App:        cfg.App.Name,
+		Home:       s.Home,
+	})
 	if err != nil {
 		exitf("failed to generate migration script: %s", err)
 	}

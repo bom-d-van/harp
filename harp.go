@@ -83,9 +83,11 @@ var (
 	noUpload   bool
 	noDeploy   bool
 	noFiles    bool
-	toTailLog  bool
 	script     string
 	migration  string
+
+	toTailLog        bool
+	tailBeginLineNum int
 
 	// TODO: can specify a single server, instead of the whole server set
 	server     string
@@ -112,6 +114,7 @@ func main() {
 	flag.BoolVar(&noFiles, "nf", false, "no files")
 
 	flag.BoolVar(&toTailLog, "log", false, "tail log after deploy")
+	flag.IntVar(&tailBeginLineNum, "n", 32, "tail log tail localtion line number (tail -n 32)")
 
 	flag.BoolVar(&help, "help", false, "print helps")
 	flag.BoolVar(&help, "h", false, "print helps")
@@ -178,7 +181,7 @@ func main() {
 	}
 
 	if toTailLog {
-		tailLog(servers)
+		tailLog(servers, tailBeginLineNum)
 	}
 }
 
@@ -218,8 +221,9 @@ func inspect(servers []*Server) {
 		wg.Add(1)
 		go func(serv *Server) {
 			defer wg.Done()
+			serv.initPathes()
 			session := serv.getSession()
-			output, err := session.CombinedOutput(fmt.Sprintf("cat %s/src/%s/harp-build.info", serv.getGoPath(), cfg.App.ImportPath))
+			output, err := session.CombinedOutput(fmt.Sprintf("cat %s/src/%s/harp-build.info", serv.GoPath, cfg.App.ImportPath))
 			if err != nil {
 				exitf("failed to cat %s.info on %s: %s(%s)", cfg.App.Name, serv, err, string(output))
 			}
@@ -490,8 +494,12 @@ func kill(servers []*Server) {
 }
 
 func (s *Server) retrieveKillScript() string {
+	s.initPathes()
 	var buf bytes.Buffer
-	if err := killScriptTmpl.Execute(&buf, cfg); err != nil {
+	if err := killScriptTmpl.Execute(&buf, struct {
+		Config
+		*Server
+	}{Config: cfg, Server: s}); err != nil {
 		exitf(err.Error())
 	}
 	if debugf {
@@ -501,8 +509,8 @@ func (s *Server) retrieveKillScript() string {
 }
 
 var killScriptTmpl = template.Must(template.New("").Parse(`set -e
-if [[ -f $HOME/harp/{{.App.Name}}/app.pid ]]; then
-	target=$(cat $HOME/harp/{{.App.Name}}/app.pid);
+if [[ -f {{.Home}}/harp/{{.App.Name}}/app.pid ]]; then
+	target=$(cat {{.Home}}/harp/{{.App.Name}}/app.pid);
 	if ps -p $target > /dev/null; then
 		kill -KILL $target; > /dev/null 2>&1;
 	fi
