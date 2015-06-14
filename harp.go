@@ -135,7 +135,7 @@ func main() {
 	flag.Parse()
 
 	if versionf {
-		fmt.Printf("0.2.%d\n", version)
+		fmt.Printf("0.3.%d\n", version)
 		return
 	}
 
