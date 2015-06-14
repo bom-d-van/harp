@@ -230,7 +230,17 @@ harp xc
 
 ### Rollback
 
-By default harp will save three most recent releases in `$HOME/harp/{{.App.Name}}/releases` directory. And there is also a `rollback.sh` script in `$HOME/harp/{{.App.Name}}` that you can use to rollback release.
+By default harp will save three most recent releases in `$HOME/harp/{{.App.Name}}/releases` directory. The current release is the newest release in the releases list.
+
+```
+# list all releases
+harp -s prod rollback ls
+
+# rollback
+harp -s prod rollback 15-06-14-11:29:14
+```
+
+And there is also a `rollback.sh` script in `$HOME/harp/{{.App.Name}}` that you can use to rollback release.
 
 You can change how many releases you want to keep by `RollbackCount` or disable rollback by `NoRollback` in configs.
 
