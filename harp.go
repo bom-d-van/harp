@@ -19,6 +19,7 @@ import (
 // TODOs
 // 	rollback
 // 	snapshot
+// 	tmux support for long migrations
 
 // PRINCIPLES
 // KISS
@@ -176,6 +177,16 @@ func main() {
 		deploy(servers)
 	case "inspect":
 		inspectScript(servers, args[1])
+	case "rollback":
+		if len(args) == 1 {
+			fmt.Println("please specify rollback command or version")
+			os.Exit(1)
+		}
+		if args[1] == "ls" {
+			lsRollbackVersions(servers)
+		} else {
+			rollback(servers, strings.TrimSpace(args[1]))
+		}
 	case "cross-compile", "xc":
 		initXC()
 	}
@@ -471,6 +482,10 @@ func inspectScript(servers []*Server, name string) {
 			fmt.Println(s.retrieveRestartScript())
 		case "kill":
 			fmt.Println(s.retrieveKillScript())
+		case "rollback":
+			fmt.Println(s.retrieveRollbackScript())
+		default:
+			exitf("unknown script: %s\n", name)
 		}
 	}
 }

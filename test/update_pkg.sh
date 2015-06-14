@@ -8,3 +8,6 @@ const version = $current
 EOF
 
 git add $GOPATH/src/github.com/bom-d-van/harp/version.go
+
+echo $current >> test/files/file1
+echo $current >> test/files/file2
