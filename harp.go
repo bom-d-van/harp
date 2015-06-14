@@ -43,7 +43,8 @@ type Config struct {
 	GOOS, GOARCH string
 
 	// TODO
-	Rollback int
+	NoRollback    bool
+	RollbackCount int
 
 	// TODO: multiple instances support
 	// TODO: multiple apps support
@@ -271,6 +272,10 @@ func parseCfg(configPath string) (cfg Config) {
 				s.Port = ":22"
 			}
 		}
+	}
+
+	if cfg.RollbackCount == 0 {
+		cfg.RollbackCount = 3
 	}
 
 	return

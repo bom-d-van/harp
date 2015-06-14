@@ -112,14 +112,14 @@ func (s *Server) deploy() {
 		println("deplying", s.String())
 	}
 
-	// var output []byte
-	session := s.getSession()
-	defer session.Close()
-
 	// TODO: save scripts(s) for kill app
 	s.saveScript("restart", s.retrieveRestartScript())
 	s.saveScript("kill", s.retrieveKillScript())
 	s.saveScript("rollback", s.retrieveRollbackScript())
+
+	// var output []byte
+	session := s.getSession()
+	defer session.Close()
 
 	script := s.retrieveDeployScript()
 	if debugf {
@@ -127,6 +127,11 @@ func (s *Server) deploy() {
 	}
 	if output, err := session.CombinedOutput(script); err != nil {
 		exitf("failed to exec %s: %s %s", script, string(output), err)
+	}
+
+	// clean older releases
+	if !cfg.NoRollback {
+		s.trimOldReleases()
 	}
 }
 
@@ -211,6 +216,10 @@ touch %[2]s
 }
 
 func (s *Server) saveReleaseScript() (script string) {
+	if cfg.NoRollback {
+		return
+	}
+
 	s.initPathes()
 	app := cfg.App
 	now := time.Now().Format("06-01-02-15:04:05")
