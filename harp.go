@@ -107,13 +107,23 @@ var (
 
 func main() {
 	flag.StringVar(&configPath, "c", "harp.json", "config file path")
+
 	flag.BoolVar(&debugf, "debug", false, "print debug info")
 	// flag.BoolVar(&verbose, "v", false, "verbose")
 
 	flag.BoolVar(&noBuild, "nb", false, "no build")
+	flag.BoolVar(&noBuild, "no-build", false, "no build")
+
 	flag.BoolVar(&noUpload, "nu", false, "no upload")
+	flag.BoolVar(&noUpload, "no-upload", false, "no upload")
+
 	flag.BoolVar(&noDeploy, "nd", false, "no deploy")
+	flag.BoolVar(&noDeploy, "no-deploy", false, "no deploy")
+	flag.BoolVar(&noDeploy, "nr", false, "no run (same as -no-deploy)")
+	flag.BoolVar(&noDeploy, "no-run", false, "no run (same as -no-deploy)")
+
 	flag.BoolVar(&noFiles, "nf", false, "no files")
+	flag.BoolVar(&noFiles, "no-files", false, "no files")
 
 	flag.BoolVar(&toTailLog, "log", false, "tail log after deploy")
 	flag.IntVar(&tailBeginLineNum, "n", 32, "tail log tail localtion line number (tail -n 32)")
@@ -123,11 +133,13 @@ func main() {
 	flag.BoolVar(&versionf, "v", false, "print version num")
 	flag.BoolVar(&versionf, "version", false, "print version num")
 
-	flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
+	// flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
 
 	flag.StringVar(&serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
 	flag.StringVar(&serverSet, "server-set", "", "specify server sets to deploy, multiple sets are split by comma")
+
 	flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
+
 	flag.BoolVar(&allf, "all", false, "execute action on all server")
 
 	flag.StringVar(&migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
