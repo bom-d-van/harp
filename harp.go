@@ -183,8 +183,8 @@ func main() {
 			fmt.Println("please specify rollback command or version")
 			os.Exit(1)
 		}
-		if args[1] == "ls" {
-			lsRollbackVersions(servers)
+		if args[1] == "ls" || args[1] == "list" {
+			lsRollbackVersions(servers, args[1] == "list")
 		} else {
 			rollback(servers, strings.TrimSpace(args[1]))
 		}
@@ -348,13 +348,16 @@ usage:
     harp [options] [action]
 
 actions:
-    deploy  Deploy your application (e.g. harp -s prod deploy).
-    run     Run migrations on server (e.g. harp -s prod migrate path/to/my_migration.go).
-    kill    Kill server.
-    info    Print build info of servers (e.g. harp -s prod info).
-    log     Print real time logs of application (e.g. harp -s prod log).
-    restart Restart application (e.g. harp -s prod restart).
-    init    Initialize a harp.json file.
+    deploy   Deploy your application (e.g. harp -s prod deploy).
+    run      Run migrations on server (e.g. harp -s prod migrate path/to/my_migration.go).
+    kill     Kill server.
+    info     Print build info of servers (e.g. harp -s prod info).
+    log      Print real time logs of application (e.g. harp -s prod log).
+    restart  Restart application (e.g. harp -s prod restart).
+    init     Initialize a harp.json file.
+    rollback
+        ls       List all the current releases.
+        $version Rollback to $version.
 
 options:`)
 	flag.PrintDefaults()
