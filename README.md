@@ -218,10 +218,33 @@ Multiple migrations:
 harp -server app@192.168.59.103:49153 run migration.go "AppEnv=prod migration2.go -arg1 val1 -arg2 val2"
 ```
 
+__Note__: Harp saved the current migration files in `$HOME/harp/{{.App.Name}}/migrations.tar.gz`. You can uncompress it and execute the binary manually if you prefer or on special occasions.
+
 ### Initialize go cross compilation
 
 If you need to initialize cross compilation environment, harp has a simple commend to help you:
 
 ```
 harp xc
+```
+
+### Rollback
+
+By default harp will save three most recent releases in `$HOME/harp/{{.App.Name}}/releases` directory. And there is also a `rollback.sh` script in `$HOME/harp/{{.App.Name}}` that you can use to rollback release.
+
+You can change how many releases you want to keep by `RollbackCount` or disable rollback by `NoRollback` in configs.
+
+```
+{
+	"GOOS": "linux",   // for go build
+	"GOARCH": "amd64", // for go build
+
+	"NoRollback": true,
+	"RollbackCount": 10,
+
+	"App": {
+		...
+	},
+	...
+}
 ```
