@@ -49,9 +49,16 @@ example:
 	"App": {
 		"Name":       "app",
 		"ImportPath": "github.com/bom-d-van/harp/test",
+
+		// these are included in all file Excludeds
+		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/"],
 		"Files":      [
+			// files here could be a string or an object
 			"github.com/bom-d-van/harp/test/files",
-			"github.com/bom-d-van/harp/test/file"
+			{
+				"Path": "github.com/bom-d-van/harp/test/file",
+				"Excludeds": ["builds"]
+			}
 		]
 	},
 	"Servers": {

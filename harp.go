@@ -82,8 +82,8 @@ type App struct {
 	Name       string
 	ImportPath string
 
-	DefaultExcludedFiles []string
-	Files                []File
+	DefaultExcludeds []string
+	Files            []File
 	// Files []string
 
 	Args []string
@@ -333,7 +333,7 @@ func syncFiles() {
 					exitf("fielpath.Rel(%s, %s) error: %s", base, path, err)
 				}
 
-				for _, e := range append(cfg.App.DefaultExcludedFiles, f.Excludes...) {
+				for _, e := range append(cfg.App.DefaultExcludeds, f.Excludeds...) {
 					matched, err := filepath.Match(e, rel)
 					if err != nil {
 						exitf("filepath.Match(%s, %s) error: %s", e, rel, err)
@@ -610,7 +610,7 @@ func initHarp() {
 		"name":       "app",
 		"importpath": "%s",
 		"envs": {},
-		"DefaultExcludedFiles": [".git/", "tmp/", ".DS_Store", "node_modules/"],
+		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/"],
 		"files":      [
 			"%s"
 		]

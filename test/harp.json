@@ -8,7 +8,7 @@
 			"github.com/bom-d-van/harp/test/file",
 			{
 				"Path": "github.com/bom-d-van/harp/test/files",
-				"Excludes": ["file1"]
+				"Excludeds": ["file1"]
 			}
 		]
 	},

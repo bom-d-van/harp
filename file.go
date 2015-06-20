@@ -7,8 +7,8 @@ import (
 )
 
 type File struct {
-	Path     string
-	Excludes []string
+	Path      string
+	Excludeds []string
 }
 
 // "rsync", "-P", "-az", "--delete", "-e", ssh, "tmp/"+appName, dst
@@ -20,14 +20,14 @@ func (f *File) UnmarshalJSON(data []byte) (err error) {
 	}
 
 	var v struct {
-		Path     string
-		Excludes []string
+		Path      string
+		Excludeds []string
 	}
 	if err = json.Unmarshal(data, &v); err != nil {
 		return
 	}
 
 	f.Path = v.Path
-	f.Excludes = v.Excludes
+	f.Excludeds = v.Excludeds
 	return
 }
