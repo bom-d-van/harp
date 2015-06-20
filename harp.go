@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime/debug"
 	"sort"
@@ -46,6 +47,14 @@ func init() {
 	} else {
 		log.SetFlags(0)
 	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+			cleanCaches()
+		}
+	}()
 }
 
 type Config struct {
@@ -130,14 +139,7 @@ func main() {
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		exitf("os.MkdirAll(%s) error: %s", tmpDir, err)
 	}
-	defer func() {
-		if keepCache {
-			return
-		}
-		if err := os.RemoveAll(tmpDir); err != nil {
-			exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
-		}
-	}()
+	defer cleanCaches()
 
 	flag.StringVar(&configPath, "c", "harp.json", "config file path")
 
@@ -193,9 +195,14 @@ func main() {
 		return
 	}
 
-	if args[0] == "init" {
+	switch args[0] {
+	case "init":
 		initHarp()
 		return
+	case "clean":
+		keepCache = false
+		// log.Println("removing .harp")
+		cleanCaches()
 	}
 
 	cfg = parseCfg(configPath)
@@ -691,5 +698,15 @@ func initXC() {
 	err := cmd.Run()
 	if err != nil {
 		exitf("failed to init cross compilation (GOOS=%s, GOARCH=%s): %s", cfg.GOOS, cfg.GOARCH, err)
+	}
+}
+
+func cleanCaches() {
+	defer func() { os.Exit(0) }()
+	if keepCache {
+		return
+	}
+	if err := os.RemoveAll(tmpDir); err != nil {
+		exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
 	}
 }
