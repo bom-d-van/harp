@@ -3,13 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -35,76 +35,58 @@ type Server struct {
 	client *ssh.Client
 }
 
+// copy files into tmp/harp/
+// exclude files
 func (s *Server) upload(info string) {
 	s.initSetUp()
+	s.initPathes()
 
-	var wg sync.WaitGroup
 	ssh := fmt.Sprintf(`ssh -l %s -p %s`, s.User, strings.TrimLeft(s.Port, ":"))
-	appName := cfg.App.Name
-	// files upload
-	wg.Add(len(cfg.App.Files))
-	for _, src := range cfg.App.Files {
-		go func(src string) {
-			osrc := src
-			defer func() {
-				fmt.Printf("%s uploaded: %s\n", s, osrc)
-				wg.Done()
-			}()
-			dst := fmt.Sprintf("%s@%s:harp/%s/files/%s", s.User, s.Host, appName, strings.Replace(src, "/", "_", -1))
-			for _, path := range GoPaths {
-				src = filepath.Join(path, "src", osrc)
-				if fi, err := os.Stat(src); err != nil {
-					src = ""
-					continue
-				} else if fi.IsDir() {
-					src += "/"
-				}
 
-				break
-			}
-			if src == "" {
-				exitf("failed to find %s from %s", osrc, GoPaths)
-			}
-			fmt.Printf("%s uploading: %s (from %s)\n", s, osrc, src)
-			output, err := exec.Command("rsync", "-az", "--delete", "-e", ssh, src, dst).CombinedOutput()
-			if err != nil {
-				exitf("failed to sync %s: %s: %s", src, err, string(output))
-			}
-		}(src)
+	appName := cfg.App.Name
+	dst := fmt.Sprintf("%s@%s:%s/harp/%s/", s.User, s.Host, s.Home, appName)
+	// if debugf {
+	// 	fmt.Println("rsync", "-az", "--delete", "-e", ssh, filepath.Join(tmpDir, appName), filepath.Join(tmpDir, "files"), dst)
+	// }
+	args := []string{"-az", "--delete", "-e", ssh}
+	if debugf {
+		args = append(args, "-P")
+	}
+	if !noBuild {
+		args = append(args, filepath.Join(tmpDir, appName))
+	}
+	if !noFiles {
+		args = append(args, filepath.Join(tmpDir, "files"))
+	}
+	cmd := exec.Command("rsync", append(args, dst)...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		exitf("failed to sync binary %s: %s", appName, err)
 	}
 
-	// binary upload
-	wg.Add(1)
-	go func() {
-		defer func() {
-			fmt.Printf("%s uploaded: binary %s\n", s, appName)
-			wg.Done()
-		}()
-		fmt.Printf("%s uploading: binary %s\n", s, appName)
-		dst := fmt.Sprintf("%s@%s:harp/%s/%s", s.User, s.Host, appName, appName)
-		if debugf {
-			fmt.Println("rsync", "-az", "--delete", "-e", ssh, "tmp/"+appName, dst)
-		}
-		output, err := exec.Command("rsync", "-az", "--delete", "-e", ssh, "tmp/"+appName, dst).CombinedOutput()
-		if err != nil {
-			exitf("failed to sync binary %s: %s: %s", appName, err, string(output))
-		}
-	}()
+	session := s.getSession()
+	output, err := session.CombinedOutput(fmt.Sprintf("cat <<EOF > %s/harp/%s/harp-build.info\n%s\nEOF", s.Home, appName, info))
+	if err != nil {
+		exitf("failed to save build info: %s: %s", err, string(output))
+	}
+	session.Close()
+}
 
-	// build info upload
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		session := s.getSession()
-		cmd := fmt.Sprintf("cat <<EOF > harp/%s/harp-build.info\n%s\nEOF", appName, info)
-		output, err := session.CombinedOutput(cmd)
-		if err != nil {
-			exitf("failed to save build info: %s: %s", err, string(output))
-		}
-		session.Close()
-	}()
-
-	wg.Wait()
+func copyFile(dst, src string) {
+	srcf, err := os.Open(src)
+	if err != nil {
+		exitf("os.Open(%s) error: %s", src, err)
+	}
+	dstf, err := os.Create(dst)
+	if err != nil {
+		exitf("os.Create(%s) error: %s", dst, err)
+	}
+	_, err = io.Copy(dstf, srcf)
+	if err != nil {
+		exitf("io.Copy(%s, %s) error: %s", dst, src, err)
+	}
 }
 
 func (s *Server) deploy() {
@@ -151,7 +133,8 @@ func (s *Server) syncFilesScript() (script string) {
 	script += fmt.Sprintf("mkdir -p %s/bin %s/src\n", s.GoPath, s.GoPath)
 
 	// TODO: handle callback error
-	for _, dst := range cfg.App.Files {
+	for _, dstf := range cfg.App.Files {
+		dst := dstf.Path
 		src := fmt.Sprintf("%s/harp/%s/files/%s", s.Home, cfg.App.Name, strings.Replace(dst, "/", "_", -1))
 		odst := dst
 		dst = fmt.Sprintf("%s/src/%s", s.GoPath, dst)
@@ -226,8 +209,8 @@ func (s *Server) saveReleaseScript() (script string) {
 	script += fmt.Sprintf(`cd %s/harp/%s
 if [[ -f harp-build.info ]]; then
 	mkdir -p releases/%s
-	cp -r app harp-build.info files kill.sh restart.sh rollback.sh releases/%s
-fi`, s.Home, app.Name, now, now)
+	cp -rf %s harp-build.info files kill.sh restart.sh rollback.sh releases/%s
+fi`, s.Home, app.Name, now, cfg.App.Name, now)
 	return
 }
 

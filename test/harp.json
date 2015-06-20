@@ -5,8 +5,11 @@
 		"Name":       "app",
 		"ImportPath": "github.com/bom-d-van/harp/test",
 		"Files":      [
-			"github.com/bom-d-van/harp/test/files",
-			"github.com/bom-d-van/harp/test/file"
+			"github.com/bom-d-van/harp/test/file",
+			{
+				"Path": "github.com/bom-d-van/harp/test/files",
+				"Excludes": ["file1"]
+			}
 		]
 	},
 	"Servers": {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,8 +28,8 @@ import (
 
 // TODO: put everything inside app path
 // local
-// 	pwd/tmp/harp
-// 	pwd/migration
+// 	pwd/.harp/files
+// 	pwd/.harp/migration
 //
 // server
 // 	$GOPATH/bin
@@ -50,12 +51,12 @@ type Config struct {
 	// TODO: multiple apps support
 	App App
 
-	// TODO: migration and flag support (-after and -before)
-	Hooks struct {
-		Deploy struct {
-			Before, After string
-		}
-	}
+	// // TODO: migration and flag support (-after and -before)
+	// Hooks struct {
+	// 	Deploy struct {
+	// 		Before, After string
+	// 	}
+	// }
 
 	Servers map[string][]*Server
 }
@@ -63,7 +64,10 @@ type Config struct {
 type App struct {
 	Name       string
 	ImportPath string
-	Files      []string
+
+	DefaultExcludedFiles []string
+	Files                []File
+	// Files []string
 
 	Args []string
 	Envs map[string]string
@@ -78,6 +82,7 @@ type App struct {
 }
 
 var (
+	// TODO: move flags into Config
 	// verbose   bool
 	configPath string
 	debugf     bool
@@ -87,6 +92,9 @@ var (
 	noFiles    bool
 	script     string
 	migration  string
+
+	softExclude bool
+	keepCache   bool
 
 	toTailLog        bool
 	tailBeginLineNum int
@@ -105,7 +113,25 @@ var (
 	GoPath  = GoPaths[0]
 )
 
+var tmpDir = ".harp"
+
 func main() {
+	if err := os.RemoveAll(tmpDir); err != nil {
+		exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
+	}
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		exitf("os.MkdirAll(%s) error: %s", tmpDir, err)
+	}
+	defer func() {
+		log.Printf("--> %+v\n", keepCache)
+		if keepCache {
+			return
+		}
+		if err := os.RemoveAll(tmpDir); err != nil {
+			exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
+		}
+	}()
+
 	flag.StringVar(&configPath, "c", "harp.json", "config file path")
 
 	flag.BoolVar(&debugf, "debug", false, "print debug info")
@@ -132,6 +158,9 @@ func main() {
 	flag.BoolVar(&help, "h", false, "print helps")
 	flag.BoolVar(&versionf, "v", false, "print version num")
 	flag.BoolVar(&versionf, "version", false, "print version num")
+
+	flag.BoolVar(&softExclude, "soft-exclude", false, "use strings.Contains to exclude files")
+	flag.BoolVar(&keepCache, "cache", false, "cache data in .harp")
 
 	// flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
 
@@ -216,6 +245,10 @@ func deploy(servers []*Server) {
 		build()
 	}
 
+	if !noUpload {
+		syncFiles()
+	}
+
 	var wg sync.WaitGroup
 	// for _, set := range serverSets {
 	// 	for _, server := range cfg.Servers[set] {
@@ -235,6 +268,98 @@ func deploy(servers []*Server) {
 		}(server)
 	}
 	// }
+	wg.Wait()
+}
+
+func init() {
+	log.SetFlags(log.Lshortfile)
+}
+
+func syncFiles() {
+	log.Println("syncing files")
+	if err := os.MkdirAll(filepath.Join(tmpDir, "files"), 0755); err != nil {
+		exitf("os.MkdirAll(.harp/files) error: %s", err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(cfg.App.Files))
+	for _, file := range cfg.App.Files {
+		go func(f File) {
+			defer func() { wg.Done() }()
+			var src, gopath string
+			for _, gopath = range GoPaths {
+				src = filepath.Join(gopath, "src", f.Path)
+				if _, err := os.Stat(src); err != nil {
+					src = ""
+					continue
+				}
+
+				break
+			}
+			if src == "" {
+				exitf("failed to find %s from %s", f.Path, GoPaths)
+			}
+
+			dst := filepath.Join(tmpDir, "files", strings.Replace(f.Path, "/", "_", -1))
+			if fi, err := os.Stat(src); err != nil {
+				exitf("os.Stat(%s) error: %s", src, err)
+			} else if fi.IsDir() {
+				if err := os.Mkdir(dst, 0755); err != nil {
+					exitf("os.Mkdir(%s) error: %s", dst, err)
+				}
+			} else {
+				copyFile(dst, src)
+			}
+			base := filepath.Join(gopath, "src", f.Path)
+			err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					exitf("walk %s: %s", path, err)
+				} else if path == base {
+					return nil
+				}
+
+				rel, err := filepath.Rel(base, path)
+				if err != nil {
+					exitf("fielpath.Rel(%s, %s) error: %s", base, path, err)
+				}
+
+				for _, e := range append(cfg.App.DefaultExcludedFiles, f.Excludes...) {
+					matched, err := filepath.Match(e, rel)
+					if err != nil {
+						exitf("filepath.Match(%s, %s) error: %s", e, rel, err)
+					}
+					if !matched && !softExclude {
+						matched = strings.Contains(rel, e)
+					}
+					if matched {
+						if info.IsDir() {
+							return filepath.SkipDir
+						} else {
+							return nil
+						}
+					}
+				}
+
+				if info.IsDir() {
+					if err := os.Mkdir(filepath.Join(dst, rel), info.Mode()); err != nil {
+						exitf("os.Mkdir(%s) error: %s", filepath.Join(dst, rel), err)
+					}
+					return nil
+				}
+
+				wg.Add(1)
+				go func() {
+					defer func() { wg.Done() }()
+					copyFile(filepath.Join(dst, rel), path)
+				}()
+				return nil
+			})
+			if err != nil && err != filepath.SkipDir {
+				exitf("walking %s: %s", src, err)
+			}
+		}(file)
+	}
+
 	wg.Wait()
 }
 
@@ -332,7 +457,7 @@ func cmd(name string, args ...string) string {
 func build() {
 	app := cfg.App
 
-	buildCmd := fmt.Sprintf("go build -a -v -o tmp/%s %s", app.Name, app.ImportPath)
+	buildCmd := fmt.Sprintf("go build -a -v -o %s %s", filepath.Join(tmpDir, app.Name), app.ImportPath)
 	if app.BuildCmd != "" {
 		buildCmd = app.BuildCmd
 	}
@@ -475,6 +600,7 @@ func initHarp() {
 		"name":       "app",
 		"importpath": "%s",
 		"envs": {},
+		"DefaultExcludedFiles": [".git/", "tmp/", ".DS_Store", "node_modules/"],
 		"files":      [
 			"%s"
 		]
