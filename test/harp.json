@@ -14,10 +14,12 @@
 	},
 	"Servers": {
 		"prod": [{
+			"ID":   "pluto",
 			"User": "app",
 			"Host": "192.168.59.103",
 			"Port": ":49153"
 		}, {
+			"ID":   "neptune",
 			"User": "app",
 			"Host": "192.168.59.103",
 			"Port": ":49154"

@@ -40,6 +40,14 @@ import (
 // 	$HOME/harp/$APP/migration.tar.gz
 // 	$HOME/harp/$APP/script
 
+func init() {
+	if debugf {
+		log.SetFlags(log.Lshortfile)
+	} else {
+		log.SetFlags(0)
+	}
+}
+
 type Config struct {
 	GOOS, GOARCH string
 
@@ -123,7 +131,6 @@ func main() {
 		exitf("os.MkdirAll(%s) error: %s", tmpDir, err)
 	}
 	defer func() {
-		log.Printf("--> %+v\n", keepCache)
 		if keepCache {
 			return
 		}
@@ -241,7 +248,7 @@ func main() {
 func deploy(servers []*Server) {
 	info := getBuildLog()
 	if !noBuild {
-		fmt.Println("building")
+		log.Println("building")
 		build()
 	}
 
@@ -257,22 +264,18 @@ func deploy(servers []*Server) {
 		go func(server *Server) {
 			defer wg.Done()
 			if !noUpload {
-				fmt.Printf("uploading: [%s] %s\n", server.Set, server)
+				log.Printf("uploading: [%s] %s\n", server.Set, server)
 				server.upload(info)
 			}
 
 			if !noDeploy {
-				fmt.Printf("deploying: [%s] %s\n", server.Set, server)
+				log.Printf("deploying: [%s] %s\n", server.Set, server)
 				server.deploy()
 			}
 		}(server)
 	}
 	// }
 	wg.Wait()
-}
-
-func init() {
-	log.SetFlags(log.Lshortfile)
 }
 
 func syncFiles() {
@@ -565,7 +568,7 @@ serversLoop:
 	for _, server := range servers {
 		for _, set := range cfg.Servers {
 			for _, s := range set {
-				if server == s.String() {
+				if server == s.String() || server == s.ID {
 					targetServers = append(targetServers, s)
 					continue serversLoop
 				}

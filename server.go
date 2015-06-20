@@ -90,9 +90,9 @@ func copyFile(dst, src string) {
 }
 
 func (s *Server) deploy() {
-	if debugf {
-		println("deplying", s.String())
-	}
+	// if debugf {
+	// 	log.Println("deplying", s.String())
+	// }
 
 	// TODO: save scripts(s) for kill app
 	s.saveScript("restart", s.retrieveRestartScript())
