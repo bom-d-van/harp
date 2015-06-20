@@ -11,51 +11,31 @@ The best way to learn what harp does and helps is to use it. (In test directory,
 ## Usage
 
 ```sh
-harp is a go application deployment tool.
-usage:
-    harp [options] [action]
+# Init harp.json
+harp init
 
-actions:
-    deploy  Deploy your application (e.g. harp -s prod deploy).
-    run     Run migrations on server (e.g. harp -s prod migrate path/to/my_migration.go).
-    kill    Kill server.
-    info    Print build info of servers (e.g. harp -s prod info).
-    log     Print real time logs of application (e.g. harp -s prod log).
-    restart Restart application (e.g. harp -s prod restart).
-    init    Initialize a harp.json file.
+# Configure your servers and apps in harp.json. see section Configuration below.
+harp -s dev deploy
 
-options:
-  -all=false: execute action on all server
-  -c="harp.json": config file path
-  -debug=false: print debug info
-  -h=false: print helps
-  -help=false: print helps
-  -log=false: tail log after deploy
-  -m="": specify migrations to run on server, multiple migrations are split by comma
-  -nb=false: no build
-  -nd=false: no deploy
-  -nf=false: no files
-  -nu=false: no upload
-  -s="": specify server sets to deploy, multiple sets are split by comma
-  -scripts="": scripts to build and run on server
-  -server="": specify servers to deploy, multiple servers are split by comma
-  -server-set="": specify server sets to deploy, multiple sets are split by comma
-  -v=false: print version num
-  -version=false: print version num
+# Or
+harp -s prod deploy
 
-examples:
-    Deploy:
-        harp -s prod -log deploy
+# Restart server
+harp -s prod restart
 
-    Compile and run a go package or file in server/Migration:
-        Simple:
-            harp -server app@192.168.59.103:49153 run migration.go
+# Shut down server
+harp -s prod kill
 
-        With env and arguments (behold the quotes):
-            harp -server app@192.168.59.103:49153 run "Env1=val Env2=val migration2.go -arg1 val1"
+# Inspect server info
+harp -s prod info
 
-        Multiple migrations (behold the quotes):
-            harp -server app@192.168.59.103:49153 run migration.go "Env1=val migration2.go -arg1 val1"
+# Rollback release
+harp -s prod rollback $version-tag
+
+# Tail server logs
+harp -s prod log
+
+# Done. More flags and usages are in harp -v
 ```
 
 ## Configuration
