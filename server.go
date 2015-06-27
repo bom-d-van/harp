@@ -130,7 +130,7 @@ func (s *Server) scriptData() interface{} {
 func (s *Server) syncFilesScript() (script string) {
 	// gopath := s.getGoPath()
 	s.initPathes()
-	script += fmt.Sprintf("mkdir -p %s/bin %s/src\n", s.GoPath, s.GoPath)
+	script += fmt.Sprintf("mkdir -p %s/bin %s/src %s/src/%s\n", s.GoPath, s.GoPath, s.GoPath, cfg.App.ImportPath)
 
 	// TODO: handle callback error
 	for _, dstf := range cfg.App.Files {
