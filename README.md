@@ -8,6 +8,13 @@ Harp simply builds your application and upload it to your server. It brings you 
 
 The best way to learn what harp does and helps is to use it. (In test directory, there are docker files and harp configurations you can play with)
 
+## System requirements
+
+Local: Harps works on Mac OS X, Linus, Windows isn't tested.
+Server: Harps works on Linus servers.
+
+Third-party requierments: tar, rsync on both server and local.
+
 ## Usage
 
 ```sh
@@ -159,13 +166,25 @@ Add `BuildCmd` option in `App` as bellow:
 ```
 "App": {
 	"Name":       "app",
-	"BuildCmd":   "docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/local/go/bin/go build -o path/to/app/tmp/app project/import/path'"
+	"BuildCmd":   "docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/local/go/bin/go build -o /home/app/src/github.com/bom-d-van/harp/%s %s'"
 }
 ```
 
+The first `%s` represents the harp temporary output, and the second `%s` represents a import path or a file path for some migrations. An example output in `test/harp2.json` is:
+
+```sh
+# for normal builds
+docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/local/go/bin/go build -o \$GOPATH/src/github.com/bom-d-van/harp/.harp/app github.com/bom-d-van/harp/test'
+
+# for migrations/runs
+docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/local/go/bin/go build -o \$GOPATH/src/github.com/bom-d-van/harp/.harp/migrations/migration3.go github.com/bom-d-van/harp/test/migration3'
+```
+
+__NOTE:__ Build override doesn't support non-package migrations. i.e. every migration under build override has to be a legal go package.
+
 Build override is useful doing cross compilation for cgo-involved projects, e.g. using Mac OS X building Linux binaries by docker or any other tools etc.
 
-Note: harp expects build output appears in directory `tmp/{{app name}}` where you evoke harp command (i.e. pwd).
+Note: Harps is saving temporary build output and files in `$(pwd)/.harp`. Therefore harp expects build output appears in directory `$(pwd)/.harp/{{app name}}` where you evoke harp command (i.e. pwd). And `$(pwd)/.harp/migrations/{{migration name}}` for migrations.
 
 ### Script Override
 

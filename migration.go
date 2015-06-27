@@ -16,12 +16,24 @@ import (
 )
 
 func migrate(servers []*Server, migrations []Migration) {
-	cmd("mkdir", "-p", "tmp/migrations")
+	cmd("mkdir", "-p", tmpDir+"/migrations")
 
 	if !noBuild {
 		println("building")
 		for _, migration := range migrations {
-			cmd("go", "build", "-o", "tmp/migrations/"+migration.Base, migration.File)
+			// cmd("go", "build", "-o", tmpDir+"/migrations/"+migration.Base, migration.File)
+			output := filepath.Join(tmpDir, "migrations", migration.Base)
+			build := fmt.Sprintf("go build -o %s %s", output, migration.File)
+
+			// Note: Build override doesn't support non-import-path migrations
+			if cfg.App.BuildCmd != "" {
+				build = fmt.Sprintf(cfg.App.BuildCmd, output, migration.File)
+			}
+
+			if debugf {
+				println("build cmd:", build)
+			}
+			cmd("sh", "-c", build)
 		}
 
 		println("bundling")
@@ -49,7 +61,7 @@ func migrate(servers []*Server, migrations []Migration) {
 }
 
 func bundleMigration(migrations []Migration) {
-	dst, err := os.OpenFile("tmp/migrations.tar.gz", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	dst, err := os.OpenFile(tmpDir+"/migrations.tar.gz", os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -60,9 +72,9 @@ func bundleMigration(migrations []Migration) {
 	defer tarw.Close()
 
 	for _, migration := range migrations {
-		file, err := os.Open("tmp/migrations/" + migration.Base)
+		file, err := os.Open(tmpDir + "/migrations/" + migration.Base)
 		if err != nil {
-			exitf("failed to open tmp/migrations/%s: %s", migration.Base, err)
+			exitf("failed to open %s/migrations/%s: %s", tmpDir, migration.Base, err)
 		}
 		fi, err := file.Stat()
 		if err != nil {
@@ -73,9 +85,9 @@ func bundleMigration(migrations []Migration) {
 }
 
 func (s *Server) uploadMigration(migrations []Migration) {
-	src, err := os.OpenFile("tmp/migrations.tar.gz", os.O_RDONLY, 0644)
+	src, err := os.OpenFile(tmpDir+"/migrations.tar.gz", os.O_RDONLY, 0644)
 	if err != nil {
-		exitf("failed to open tmp/migrations.tar.gz: %s", err)
+		exitf("failed to open %s/migrations.tar.gz: %s", tmpDir, err)
 	}
 	defer func() { src.Close() }()
 

@@ -47,6 +47,10 @@ echo tmp/harp -c test/harp.json -s prod migrate github.com/bom-d-van/harp/test/m
 tmp/harp -c test/harp.json -s prod migrate github.com/bom-d-van/harp/test/migration3
 
 echo ====================
+echo tmp/harp -c test/harp2.json -s prod migrate github.com/bom-d-van/harp/test/migration3
+tmp/harp -c test/harp2.json -s prod migrate github.com/bom-d-van/harp/test/migration3
+
+echo ====================
 echo tmp/harp -c test/harp.json -s prod rollback ls
 for version in `tmp/harp -c test/harp.json -s prod rollback ls | tail -2`; do
 	echo rollback version: $version

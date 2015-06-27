@@ -417,6 +417,13 @@ func parseCfg(configPath string) (cfg Config) {
 	for k, set := range cfg.Servers {
 		for _, s := range set {
 			s.Set = k
+			if s.User == "" {
+				fmt.Printf("%s contains server with empty user name\n", k)
+				os.Exit(1)
+			} else if s.Host == "" {
+				fmt.Printf("%s contains server with empty host\n", k)
+				os.Exit(1)
+			}
 			if s.Port == "" {
 				s.Port = ":22"
 			}
@@ -471,9 +478,10 @@ func cmd(name string, args ...string) string {
 func build() {
 	app := cfg.App
 
-	buildCmd := fmt.Sprintf("go build -a -v -o %s %s", filepath.Join(tmpDir, app.Name), app.ImportPath)
+	boutput := filepath.Join(tmpDir, app.Name)
+	buildCmd := fmt.Sprintf("go build -a -v -o %s %s", boutput, app.ImportPath)
 	if app.BuildCmd != "" {
-		buildCmd = app.BuildCmd
+		buildCmd = fmt.Sprintf(app.BuildCmd, boutput, app.ImportPath)
 	}
 	if debugf {
 		println("build cmd:", buildCmd)
