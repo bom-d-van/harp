@@ -607,11 +607,12 @@ func initHarp() {
 	}
 	gopath := filepath.Join(filepath.SplitList(os.Getenv("GOPATH"))[0], "src")
 	importpath := strings.Replace(wd, gopath+"/", "", 1)
+	appName := filepath.Base(importpath)
 	file.WriteString(fmt.Sprintf(`{
 	"goos": "linux",
 	"goarch": "amd64",
 	"app": {
-		"name":       "app",
+		"name":       "%s",
 		"importpath": "%s",
 		"envs": {},
 		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/"],
@@ -628,7 +629,7 @@ func initHarp() {
 			"port": ":22"
 		}]
 	}
-}`, importpath, importpath))
+}`, appName, importpath, importpath))
 }
 
 func inspectScript(servers []*Server, name string) {
