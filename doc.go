@@ -1,5 +1,7 @@
 // Package harp is a go application deploy tool.
 //
+// Please consult up-to-date README from https://github.com/bom-d-van/harp. Docs here are made for good GoDoc Searches.
+//
 // What Harp Does
 //
 // Harp simply builds your application and upload it to your server. It brings you a complete solution for deploying common applications. It syncs, restarts, kills, and deploys your applications.
