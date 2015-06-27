@@ -245,6 +245,9 @@ func main() {
 		}
 	case "cross-compile", "xc":
 		initXC()
+	default:
+		fmt.Println("unknown command:", args[0])
+		os.Exit(1)
 	}
 
 	if toTailLog {
@@ -424,6 +427,8 @@ func parseCfg(configPath string) (cfg Config) {
 	if cfg.RollbackCount == 0 {
 		cfg.RollbackCount = 3
 	}
+
+	cfg.App.DefaultExcludeds = append(cfg.App.DefaultExcludeds, ".harp/")
 
 	return
 }
