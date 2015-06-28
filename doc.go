@@ -1,4 +1,4 @@
-// Package harp is a go application deploy tool.
+// Package harp is a go application deploy tool (or an easy way to start go daemon or run go programs on remote servers).
 //
 // Please consult up-to-date README from https://github.com/bom-d-van/harp. Docs here are made for good GoDoc Searches.
 //

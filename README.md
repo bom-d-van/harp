@@ -1,6 +1,6 @@
 # harp
 
-a go application deploy tool.
+A go application deploy tool (or an easy way to start daemon or run go programs on remote servers).
 
 ## What harp does
 
