@@ -260,6 +260,7 @@ A default deploy script is:
 ```
 set -e
 {{.SyncFiles}}
+{{.SaveRelease}}
 {{.RestartServer}}
 ```
 
