@@ -42,7 +42,22 @@ harp -s prod rollback $version-tag
 # Tail server logs
 harp -s prod log
 
-# Done. More flags and usages are in harp -v
+# Specify config files
+harp -s prod -c config/harp.json deploy
+
+# Upload builds/migrations without executing it immediately
+harp -s prod -no-run deploy
+# Or shorter
+harp -s prod -nr deploy
+
+# Skip builds
+harp -s prod -no-build deploy
+
+# Skip file uploads
+harp -s prod -no-files deploy
+
+# More flags and usages
+harp -h
 ```
 
 ## Configuration
