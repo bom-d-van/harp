@@ -316,7 +316,10 @@ func syncFiles() {
 			if fi, err := os.Stat(src); err != nil {
 				exitf("os.Stat(%s) error: %s", src, err)
 			} else if fi.IsDir() {
-				if err := os.Mkdir(dst, 0755); err != nil {
+				if debugf {
+					log.Println(dst, fi.Mode())
+				}
+				if err := os.Mkdir(dst, fi.Mode()); err != nil {
 					exitf("os.Mkdir(%s) error: %s", dst, err)
 				}
 			} else {
@@ -353,6 +356,9 @@ func syncFiles() {
 				}
 
 				if info.IsDir() {
+					if debugf {
+						log.Println(filepath.Join(dst, rel), info.Mode())
+					}
 					if err := os.Mkdir(filepath.Join(dst, rel), info.Mode()); err != nil {
 						exitf("os.Mkdir(%s) error: %s", filepath.Join(dst, rel), err)
 					}

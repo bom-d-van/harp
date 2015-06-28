@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -79,7 +80,14 @@ func copyFile(dst, src string) {
 	if err != nil {
 		exitf("os.Open(%s) error: %s", src, err)
 	}
-	dstf, err := os.Create(dst)
+	stat, err := srcf.Stat()
+	if err != nil {
+		exitf("srcf.Stat(%s) error: %s", src, err)
+	}
+	if debugf {
+		log.Println(src, stat.Mode())
+	}
+	dstf, err := os.OpenFile(dst, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, stat.Mode())
 	if err != nil {
 		exitf("os.Create(%s) error: %s", dst, err)
 	}
