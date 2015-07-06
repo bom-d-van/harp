@@ -454,13 +454,41 @@ func getBuildLog() string {
 	if cfg.GOARCH != "" {
 		info += "GOARCH: " + cfg.GOARCH + "\n"
 	}
-	if isUsingGit() {
-		info += "Git Checksum: " + cmd("git", "rev-parse", "HEAD")
-		info += "Composer: " + cmd("git", "config", "user.name")
+
+	vcs, checksum := retrieveChecksum()
+	info += vcs + " Checksum: " + checksum
+
+	author := tryCmd("git", "config", "user.name")
+	if author == "" {
+		author = tryCmd("whoami")
 	}
+	if author == "" {
+		author = "Unknown"
+	}
+	info += "Composer: " + author
+
 	info += "Build At: " + time.Now().String()
 
 	return info
+}
+
+func retrieveChecksum() (vcs, checksum string) {
+	checksum = tryCmd("git", "rev-parse", "HEAD")
+	if checksum != "" {
+		return "Git", checksum
+	}
+
+	checksum = tryCmd("hg", "id", "-i")
+	if checksum != "" {
+		return "Hg", checksum
+	}
+
+	checksum = tryCmd("bzr", "version-info", "--custom", `--template="{revision_id}\n"`)
+	if checksum != "" {
+		return "Bzr", checksum
+	}
+
+	return
 }
 
 func isUsingGit() bool {
@@ -476,6 +504,19 @@ func cmd(name string, args ...string) string {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		exitf("faied to run %s %s: %s(%s)\n", name, args, err, string(output))
+	}
+
+	return string(output)
+}
+
+func tryCmd(name string, args ...string) string {
+	cmd := exec.Command(name, args...)
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "GOOS="+cfg.GOOS, "GOARCH="+cfg.GOARCH)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil && debugf {
+		log.Printf("faied to run %s %s: %s(%s)\n", name, args, err, string(output))
 	}
 
 	return string(output)
