@@ -81,11 +81,22 @@ example:
 			{
 				"Path": "github.com/bom-d-van/harp/test/file",
 				"Excludeds": ["builds"]
+			},
+			{
+				"Path": "github.com/bom-d-van/harp/test/file2",
+				// These option will enable rsync --delete during deploy
+				// You can check the effect with `harp inspect deploy`
+				// Need to be careful with this option.
+				//
+				// Because it may cause some wanted results, so it's
+				// disabled by default
+				"Delete": true
 			}
 		]
 	},
 	"Servers": {
 		"prod": [{
+			"ID":  "pluto", // ID field could be used to specify server with `-server` flag
 			"User": "app",
 			"Host": "192.168.59.103",
 			"Port": ":49155"
@@ -273,6 +284,10 @@ set -e
 ```
 
 You can inspect your script by evoking command: `harp -s prod inspect deploy` or `harp -s prod inspect restart`.
+
+### Informations
+
+There are many information about your deploys and builds are saved by harp. You can retrieve them by these respective comamnds.
 
 ### Initialize go cross compilation
 
