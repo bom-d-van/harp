@@ -304,7 +304,7 @@ Build At: 2015-07-06 21:28:55.359181899 +0800 CST
 
 Note: Composer means deployer.
 
-You can specify your composer name by saving your name a file named `.harp-composer`.
+You can specify your composer name by saving your name in a file named `.harp-composer`.
 
 ### Initialize go cross compilation
 
