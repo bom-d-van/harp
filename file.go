@@ -7,8 +7,13 @@ import (
 )
 
 type File struct {
+	file
+}
+
+type file struct {
 	Path      string
 	Excludeds []string
+	Delete    bool // delete extraneous files from dest dirs
 }
 
 // "rsync", "-P", "-az", "--delete", "-e", ssh, "tmp/"+appName, dst
@@ -19,15 +24,9 @@ func (f *File) UnmarshalJSON(data []byte) (err error) {
 		return
 	}
 
-	var v struct {
-		Path      string
-		Excludeds []string
-	}
-	if err = json.Unmarshal(data, &v); err != nil {
+	if err = json.Unmarshal(data, &f.file); err != nil {
 		return
 	}
 
-	f.Path = v.Path
-	f.Excludeds = v.Excludeds
 	return
 }

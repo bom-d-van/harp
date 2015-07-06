@@ -162,8 +162,11 @@ func (s *Server) syncFilesScript() (script string) {
 		}
 
 		script += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
-		// script += fmt.Sprintf("rsync -az --delete \"%s\" \"%s\"\n", src, dst)
-		script += fmt.Sprintf("rsync -az \"%s\" \"%s\"\n", src, dst)
+		var delete string
+		if dstf.Delete {
+			delete = "--delete"
+		}
+		script += fmt.Sprintf("rsync -az %s \"%s\" \"%s\"\n", delete, src, dst)
 	}
 
 	script += fmt.Sprintf("cp %s/harp/%s/harp-build.info %s/src/%s/\n", s.Home, cfg.App.Name, s.GoPath, cfg.App.ImportPath)
