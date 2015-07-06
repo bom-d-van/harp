@@ -285,9 +285,26 @@ set -e
 
 You can inspect your script by evoking command: `harp -s prod inspect deploy` or `harp -s prod inspect restart`.
 
-### Informations
+### Server Informations
 
-There are many information about your deploys and builds are saved by harp. You can retrieve them by these respective comamnds.
+You can use `harp info` to retrieve build and deploy information about the current running server. For example:
+
+```sh
+harp info
+
+===== app@192.168.59.103:49153
+Go Version: go version go1.4.2 darwin/amd64
+GOOS: linux
+GOARCH: amd64
+Git Checksum: f8eb715f33c36d8ec018fe116491a01540106fc8
+Composer: bom_d_van
+Build At: 2015-07-06 21:28:55.359181899 +0800 CST
+
+```
+
+Note: Composer means deployer.
+
+You can specify your composer name by saving your name a file named `.harp-composer`.
 
 ### Initialize go cross compilation
 

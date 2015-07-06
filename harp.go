@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -59,9 +60,11 @@ func init() {
 type Config struct {
 	GOOS, GOARCH string
 
-	// TODO
 	NoRollback    bool
 	RollbackCount int
+
+	// TODO
+	BuildVersionCmd string
 
 	// TODO: multiple instances support
 	// TODO: multiple apps support
@@ -458,14 +461,7 @@ func getBuildLog() string {
 	vcs, checksum := retrieveChecksum()
 	info += vcs + " Checksum: " + checksum
 
-	author := tryCmd("git", "config", "user.name")
-	if author == "" {
-		author = tryCmd("whoami")
-	}
-	if author == "" {
-		author = "Unknown"
-	}
-	info += "Composer: " + author
+	info += "Composer: " + retrieveAuthor()
 
 	info += "Build At: " + time.Now().String()
 
@@ -489,6 +485,25 @@ func retrieveChecksum() (vcs, checksum string) {
 	}
 
 	return
+}
+
+func retrieveAuthor() (author string) {
+	name, err := ioutil.ReadFile(".harp-composer")
+	if err == nil && len(name) > 0 {
+		return string(name)
+	}
+
+	author = tryCmd("git", "config", "user.name")
+	if author != "" {
+		return
+	}
+
+	author = tryCmd("whoami")
+	if author != "" {
+		return
+	}
+
+	return "Unknown"
 }
 
 func isUsingGit() bool {
