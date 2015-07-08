@@ -313,3 +313,5 @@ If you need to initialize cross compilation environment, harp has a simple comme
 ```
 harp xc
 ```
+
+Note: before using `harp xc`, you need to enable cross compilation by installing go from source, details could be found here: https://golang.org/doc/install/source
