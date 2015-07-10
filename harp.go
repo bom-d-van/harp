@@ -253,6 +253,11 @@ func main() {
 	}
 
 	if toTailLog {
+		if !keepCache {
+			if err := os.RemoveAll(tmpDir); err != nil {
+				exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
+			}
+		}
 		tailLog(servers, tailBeginLineNum)
 	}
 }
