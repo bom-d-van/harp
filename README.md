@@ -61,6 +61,16 @@ harp -s prod -no-files deploy
 harp -h
 ```
 
+## Common Trouble Shootings
+
+### To many open files
+
+To fix this problem, you need to increase your ulimit:
+
+```
+ulimit -n 10000 // or any number that is large enough
+```
+
 ## Configuration
 
 example:
