@@ -20,8 +20,8 @@ server2=harp_test_server2
 docker run -P -p 49153:22 -d -v ~/.ssh/id_rsa.pub:/home/app/.ssh/authorized_keys --name $server1 sshd
 docker run -P -p 49154:22 -d -v ~/.ssh/id_rsa.pub:/home/app/.ssh/authorized_keys --name $server2 sshd
 
-trap 'cat tmp/test.log' ERR
-rm -f tmp/test.log
+# trap 'cat tmp/test.log' ERR
+# rm -f tmp/test.log
 
 echo ====================
 echo tmp/harp -c test/harp.json -s prod deploy
@@ -56,7 +56,7 @@ for version in `tmp/harp -c test/harp.json -s prod rollback ls | tail -2`; do
 	echo rollback version: $version
 	tmp/harp -c test/harp.json -s prod rollback $version
 	ssh app@192.168.59.103 -p 49153 -- cat /home/app/harp/app/app.log
-	ssh app@192.168.59.103 -p 49153 -- cat /home/app/src/github.com/bom-d-van/harp/test/files/file1
+	# ssh app@192.168.59.103 -p 49153 -- cat /home/app/src/github.com/bom-d-van/harp/test/files/file1
 	ssh app@192.168.59.103 -p 49153 -- cat /home/app/src/github.com/bom-d-van/harp/test/files/file2
 done
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -17,6 +18,8 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/DisposaBoy/JsonConfigReader"
 )
 
 // TODOs
@@ -410,7 +413,8 @@ func inspect(servers []*Server) {
 }
 
 func parseCfg(configPath string) (cfg Config) {
-	cfgFile, err := os.OpenFile(configPath, os.O_RDONLY, 0644)
+	var r io.Reader
+	r, err := os.OpenFile(configPath, os.O_RDONLY, 0644)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Printf("Config %s doesn't exist or is unspecified.\nTo specify with flag -c (e.g. -c harp.json)\n", configPath)
@@ -419,7 +423,8 @@ func parseCfg(configPath string) (cfg Config) {
 		}
 		exitf("failed to read config: %s", err)
 	}
-	err = json.NewDecoder(cfgFile).Decode(&cfg)
+	r = JsonConfigReader.New(r)
+	err = json.NewDecoder(r).Decode(&cfg)
 	if err != nil {
 		exitf("failed to parse config: %s", err)
 	}
