@@ -149,6 +149,14 @@ func (s *Server) runMigration(migrations []Migration) {
 	// TODO: to refactor
 	s.initPathes()
 
+	var envs string
+	for k, v := range s.Envs {
+		envs += fmt.Sprintf("%s=%s ", k, v)
+	}
+	for i := range migrations {
+		migrations[i].Envs += migrations[i].Envs + " " + envs
+	}
+
 	session := s.getSession()
 	var script bytes.Buffer
 	err := migrationScript.Execute(&script, struct {
