@@ -284,7 +284,11 @@ func deploy(servers []*Server) {
 		go func(server *Server) {
 			defer wg.Done()
 			if !noUpload {
-				log.Printf("uploading: [%s] %s\n", server.Set, server)
+				diff := server.diffFiles()
+				if diff != "" {
+					diff = "diff: \n" + diff
+				}
+				log.Printf("uploading: [%s] %s\n%s", server.Set, server, diff)
 				server.upload(info)
 			}
 

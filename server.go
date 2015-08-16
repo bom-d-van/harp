@@ -75,6 +75,17 @@ func (s *Server) upload(info string) {
 	session.Close()
 }
 
+type fileInfo struct {
+	dst, src string
+	size     string
+}
+
+func (f fileInfo) relDst() string {
+	return strings.TrimPrefix(f.dst, filepath.Join(tmpDir, "files")+string(filepath.Separator))
+}
+
+var localFiles = map[string]fileInfo{}
+
 func copyFile(dst, src string) {
 	srcf, err := os.Open(src)
 	if err != nil {
@@ -84,11 +95,19 @@ func copyFile(dst, src string) {
 	if err != nil {
 		exitf("srcf.Stat(%s) error: %s", src, err)
 	}
+
+	fi := fileInfo{
+		dst:  dst,
+		src:  src,
+		size: fmtFileSize(stat.Size()),
+	}
+	localFiles[dst] = fi
+
 	if debugf {
 		log.Println(src, stat.Mode())
 	}
 	if stat.Size() > 1<<20 {
-		fmt.Printf("big file: (%s) %s\n", fmtFileSize(stat.Size()), src)
+		fmt.Printf("big file: (%s) %s\n", fi.size, src)
 	}
 	dstf, err := os.OpenFile(dst, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, stat.Mode())
 	if err != nil {
@@ -435,4 +454,42 @@ func (s *Server) initSetUp() {
 		s.initClient()
 	}
 	runCmd(s.client, fmt.Sprintf("mkdir -p harp/%s/files", cfg.App.Name))
+}
+
+// TODO: add test
+func (s *Server) diffFiles() string {
+	s.initPathes()
+
+	session := s.getSession()
+	fileRoot := fmt.Sprintf("%s/harp/%s/files/", s.Home, cfg.App.Name)
+	cmd := fmt.Sprintf(`if [[ -d "%s/harp/%s/" ]]; then
+		find %s -type f
+	fi`, s.Home, cfg.App.Name, fileRoot)
+	output, err := session.CombinedOutput(cmd)
+	if err != nil {
+		exitf("failed to retrieve files: %s: %s %s", cmd, err, output)
+	}
+	session.Close()
+	serverFiles := map[string]struct{}{}
+	for _, f := range strings.Split(string(output), "\n") {
+		if f == "" {
+			continue
+		}
+		serverFiles[strings.TrimPrefix(f, fileRoot)] = struct{}{}
+	}
+
+	var diff string
+	for _, lfile := range localFiles {
+		if _, ok := serverFiles[lfile.relDst()]; !ok {
+			diff += fmt.Sprintf("+ %s %s\n", lfile.size, lfile.src)
+		}
+	}
+
+	for sfile := range serverFiles {
+		if _, ok := localFiles[filepath.Join(tmpDir, "files", sfile)]; !ok {
+			diff += fmt.Sprintf("- %s\n", sfile)
+		}
+	}
+
+	return diff
 }
