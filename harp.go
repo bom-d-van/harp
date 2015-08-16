@@ -138,14 +138,6 @@ var (
 var tmpDir = ".harp"
 
 func main() {
-	if err := os.RemoveAll(tmpDir); err != nil {
-		exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
-	}
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		exitf("os.MkdirAll(%s) error: %s", tmpDir, err)
-	}
-	defer cleanCaches()
-
 	flag.StringVar(&configPath, "c", "harp.json", "config file path")
 
 	flag.BoolVar(&debugf, "debug", false, "print debug info")
@@ -265,7 +257,18 @@ func main() {
 	}
 }
 
+func initTmpDir() func() {
+	if err := os.RemoveAll(tmpDir); err != nil {
+		exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
+	}
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		exitf("os.MkdirAll(%s) error: %s", tmpDir, err)
+	}
+	return cleanCaches
+}
+
 func deploy(servers []*Server) {
+	defer initTmpDir()()
 	info := getBuildLog()
 	if !noBuild {
 		log.Println("building")

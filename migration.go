@@ -16,6 +16,7 @@ import (
 )
 
 func migrate(servers []*Server, migrations []Migration) {
+	defer initTmpDir()()
 	cmd("mkdir", "-p", tmpDir+"/migrations")
 
 	if !noBuild {
