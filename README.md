@@ -14,7 +14,7 @@ Local: Harps works on Mac OS X, Linus, Windows isn't tested.
 
 Server: Harps works on Linus servers.
 
-Third-party requierments: tar, rsync on both server and local.
+Third-party requirements: tar, rsync on both server and local.
 
 ## Usage
 
@@ -179,7 +179,7 @@ harp -s prod rollback 15-06-14-11:29:14
 
 And there is also a `rollback.sh` script in `$HOME/harp/{{.App.Name}}` that you can use to rollback release.
 
-You can change how many releases you want to keep by `RollbackCount` or disable rollback by `NoRollback` in configs.
+You can change how many releases you want to keep by `RollbackCount` or disable rollback by `NoRollback` in harp file.
 
 ```
 {
