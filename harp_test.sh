@@ -23,6 +23,9 @@ docker run -P -p 49154:22 -d -v ~/.ssh/id_rsa.pub:/home/app/.ssh/authorized_keys
 # trap 'cat tmp/test.log' ERR
 # rm -f tmp/test.log
 
+# create a big file
+dd if=/dev/zero of=test/files/big-file bs=$((3<<20)) count=1
+
 echo ====================
 echo tmp/harp -c test/harp.json -s prod deploy
 test/update_pkg.sh
@@ -60,5 +63,7 @@ for version in `tmp/harp -c test/harp.json -s prod rollback ls | tail -2`; do
 	ssh app@192.168.59.103 -p 49153 -- cat /home/app/src/github.com/bom-d-van/harp/test/files/file2
 done
 
-
 git checkout -- test/test_version.go test/files/file1 test/files/file2
+
+# remove big file
+rm test/files/big-file
