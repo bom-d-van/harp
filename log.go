@@ -24,6 +24,8 @@ func tailLog(servers []*Server, beginLineNum int) {
 			if err := session.Start(fmt.Sprintf("tail -f -n %d %s/harp/%s/app.log", beginLineNum, serv.Home, cfg.App.Name)); err != nil {
 				exitf("tail -f harp/%s/app.log error: %s", cfg.App, err)
 			}
+
+			// TODO: close session before quitting program
 		}(serv)
 	}
 
