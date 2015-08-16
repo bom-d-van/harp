@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -85,6 +86,7 @@ func (f fileInfo) relDst() string {
 }
 
 var localFiles = map[string]fileInfo{}
+var localFilesMux sync.Mutex
 
 func copyFile(dst, src string) {
 	srcf, err := os.Open(src)
@@ -101,12 +103,14 @@ func copyFile(dst, src string) {
 		src:  src,
 		size: fmtFileSize(stat.Size()),
 	}
+	localFilesMux.Lock()
 	localFiles[dst] = fi
+	localFilesMux.Unlock()
 
 	if debugf {
 		log.Println(src, stat.Mode())
 	}
-	if stat.Size() > 1<<20 {
+	if stat.Size() > cfg.App.FileWarningSize {
 		fmt.Printf("big file: (%s) %s\n", fi.size, src)
 	}
 	dstf, err := os.OpenFile(dst, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, stat.Mode())

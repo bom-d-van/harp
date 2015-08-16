@@ -98,6 +98,9 @@ type App struct {
 
 	KillSig string
 
+	// Default: 1MB
+	FileWarningSize int64
+
 	// TODO: could override default deploy script for out-of-band deploy
 	DeployScript  string
 	RestartScript string
@@ -461,6 +464,10 @@ func parseCfg(configPath string) (cfg Config) {
 	}
 
 	cfg.App.DefaultExcludeds = append(cfg.App.DefaultExcludeds, ".harp/")
+
+	if cfg.App.FileWarningSize == 0 {
+		cfg.App.FileWarningSize = 1 << 20
+	}
 
 	return
 }
