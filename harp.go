@@ -344,8 +344,11 @@ func syncFiles() {
 					exitf("os.Mkdir(%s) error: %s", dst, err)
 				}
 			} else {
+				// a single file speicified in Files.
 				copyFile(dst, src)
 			}
+
+			// handle directory here
 			base := filepath.Join(gopath, "src", f.Path)
 			err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
