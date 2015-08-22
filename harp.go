@@ -712,7 +712,7 @@ func initHarp() {
 		"name":       "%s",
 		"importpath": "%s",
 		"envs": {},
-		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/"],
+		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/", "*.swp"],
 		"files":      [
 			"%s"
 		]
