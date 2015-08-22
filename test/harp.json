@@ -4,6 +4,7 @@
 	"App": {
 		"Name":       "app",
 		"ImportPath": "github.com/bom-d-van/harp/test",
+		"DefaultExcludeds": ["*.swp"],
 		// a comment
 		// comment line 2
 		"Files":      [
