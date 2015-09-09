@@ -56,6 +56,7 @@ func init() {
 	go func() {
 		for range c {
 			cleanCaches()
+			os.Exit(0)
 		}
 	}()
 }
@@ -201,8 +202,8 @@ func main() {
 		return
 	case "clean":
 		keepCache = false
-		// log.Println("removing .harp")
 		cleanCaches()
+		return
 	}
 
 	cfg = parseCfg(configPath)
@@ -217,6 +218,7 @@ func main() {
 		// TODO
 		kill(servers)
 	case "deploy":
+		fmt.Println("here")
 		deploy(servers)
 	case "migrate", "run":
 		// TODO: could specify to run on all servers
@@ -272,6 +274,7 @@ func initTmpDir() func() {
 
 func deploy(servers []*Server) {
 	defer initTmpDir()()
+
 	info := getBuildLog()
 	if !noBuild {
 		log.Println("building")
@@ -283,8 +286,6 @@ func deploy(servers []*Server) {
 	}
 
 	var wg sync.WaitGroup
-	// for _, set := range serverSets {
-	// 	for _, server := range cfg.Servers[set] {
 	for _, server := range servers {
 		wg.Add(1)
 		go func(server *Server) {
@@ -304,7 +305,7 @@ func deploy(servers []*Server) {
 			}
 		}(server)
 	}
-	// }
+
 	wg.Wait()
 }
 
@@ -804,7 +805,6 @@ func initXC() {
 }
 
 func cleanCaches() {
-	defer func() { os.Exit(0) }()
 	if keepCache {
 		return
 	}
