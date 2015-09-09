@@ -218,7 +218,6 @@ func main() {
 		// TODO
 		kill(servers)
 	case "deploy":
-		fmt.Println("here")
 		deploy(servers)
 	case "migrate", "run":
 		// TODO: could specify to run on all servers
