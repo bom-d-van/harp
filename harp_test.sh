@@ -39,6 +39,15 @@ tmp/harp -c test/harp2.json -s prod deploy
 ssh app@192.168.59.103 -p 49153 -- cat test.log
 
 echo ====================
+echo tmp/harp -c test/harp3.json -s prod deploy
+test/update_pkg.sh
+tmp/harp -c test/harp3.json -s prod deploy
+ssh app@192.168.59.103 -p 49153 -- cat harp/app/app.log
+
+echo tmp/harp -c test/harp.json -build-args "-tags argtag" -server app@192.168.59.103:49153 deploy
+tmp/harp -c test/harp.json -build-args "-tags argtag" -server app@192.168.59.103:49153 deploy
+
+echo ====================
 echo tmp/harp -c test/harp.json -server app@192.168.59.103:49153 deploy
 tmp/harp -c test/harp.json -server app@192.168.59.103:49153 deploy
 

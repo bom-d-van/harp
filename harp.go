@@ -95,7 +95,8 @@ type App struct {
 	Args []string
 	Envs map[string]string
 
-	BuildCmd string
+	BuildCmd  string
+	BuildArgs string
 
 	KillSig string
 
@@ -131,6 +132,8 @@ var (
 	serverSets []string
 	help       bool
 	versionf   bool
+
+	buildArgs string
 
 	allf bool
 
@@ -171,6 +174,8 @@ func main() {
 
 	flag.BoolVar(&softExclude, "soft-exclude", false, "use strings.Contains to exclude files")
 	flag.BoolVar(&keepCache, "cache", false, "cache data in .harp")
+
+	flag.StringVar(&buildArgs, "build-args", "", "build args speicified for building your programs. default: -a -v")
 
 	// flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
 
@@ -568,7 +573,14 @@ func build() {
 	app := cfg.App
 
 	boutput := filepath.Join(tmpDir, app.Name)
-	buildCmd := fmt.Sprintf("go build -a -v -o %s %s", boutput, app.ImportPath)
+	ba := cfg.App.BuildArgs
+	if ba == "" {
+		ba = "-a -v"
+	}
+	if buildArgs != "" {
+		ba = buildArgs
+	}
+	buildCmd := fmt.Sprintf("go build %s -o %s %s", ba, boutput, app.ImportPath)
 	if app.BuildCmd != "" {
 		buildCmd = fmt.Sprintf(app.BuildCmd, boutput, app.ImportPath)
 	}
