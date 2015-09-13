@@ -34,7 +34,7 @@ harp -s prod restart
 # Shut down server
 harp -s prod kill
 
-# Inspect server info
+# Inspect server build info
 harp -s prod info
 
 # Rollback release
@@ -196,7 +196,28 @@ You can change how many releases you want to keep by `RollbackCount` or disable 
 }
 ```
 
+### Build Args Specification
+
+Harp supports go build tool arguments specification.
+
+```
+"App": {
+	"Name":       "app",
+	"BuildArgs":  "-tags daemon"
+}
+```
+
+You can also override or ad-hoc specify build args from command line as follows:
+
+```
+harp -s prod -build-args '-tags client' deploy
+```
+
+Note: currently migration using build args from cli are not supported yet.
+
 ### Build Override
+
+Harp allows you to override default build command.
 
 Add `BuildCmd` option in `App` as bellow:
 
