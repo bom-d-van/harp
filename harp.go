@@ -126,6 +126,8 @@ var (
 	toTailLog        bool
 	tailBeginLineNum int
 
+	syncFileLimit int
+
 	// TODO: can specify a single server, instead of the whole server set
 	server     string
 	serverSet  string
@@ -175,7 +177,7 @@ func main() {
 	flag.BoolVar(&softExclude, "soft-exclude", false, "use strings.Contains to exclude files")
 	flag.BoolVar(&keepCache, "cache", false, "cache data in .harp")
 
-	flag.StringVar(&buildArgs, "build-args", "", "build args speicified for building your programs. default: -a -v")
+	flag.StringVar(&buildArgs, "build-args", "", "build args speicified for building your programs. (default -a -v)")
 
 	// flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
 
@@ -185,6 +187,8 @@ func main() {
 	flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
 
 	flag.BoolVar(&allf, "all", false, "execute action on all server")
+
+	flag.IntVar(&syncFileLimit, "sync-queue-size", 5, "set file syncing queue size.")
 
 	flag.StringVar(&migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
 	// flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")

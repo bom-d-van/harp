@@ -21,9 +21,13 @@ func (f fileInfo) relDst() string {
 
 var localFiles = map[string]fileInfo{}
 var localFilesMux sync.Mutex
-var copyFileQueue = make(chan struct{}, 10)
+var copyFileQueue chan struct{}
+var queueInitOnce sync.Once
 
 func copyFile(dst, src string) {
+	queueInitOnce.Do(func() {
+		copyFileQueue = make(chan struct{}, 5)
+	})
 	copyFileQueue <- struct{}{}
 	defer func() { <-copyFileQueue }()
 
