@@ -68,7 +68,7 @@ harp -h
 To fix this problem, you need to increase your ulimit:
 
 ```
-ulimit -n 10000 // or any number that is large enough
+ulimit -n 10240 // or any number that is large enough
 ```
 
 ## Configuration
