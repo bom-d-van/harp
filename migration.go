@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/cheggaaa/pb"
 )
@@ -59,6 +60,7 @@ func migrate(servers []*Server, migrations []Migration) {
 		}(server)
 	}
 	wg.Wait()
+	time.Sleep(time.Second)
 }
 
 func bundleMigration(migrations []Migration) {
@@ -145,6 +147,8 @@ echo "running {{.Base}}"
 GOPATH="{{$gopath}}" {{.Envs}} {{$home}}/harp/{{$app}}/migration/{{.Base}} {{.Args}}
 {{end}}
 `))
+
+// 2>&1 | tee -a {{$home}}/harp/{{$app}}/migration.log
 
 func (s *Server) runMigration(migrations []Migration) {
 	// TODO: to refactor
