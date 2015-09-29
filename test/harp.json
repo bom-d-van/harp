@@ -1,6 +1,7 @@
 {
 	"GOOS": "linux",
 	"GOARCH": "amd64",
+	// "log_path": "harp/{{.App.Name}}/log",
 	"App": {
 		"Name":       "app",
 		"ImportPath": "github.com/bom-d-van/harp/test",

@@ -70,6 +70,8 @@ type Config struct {
 	// TODO
 	BuildVersionCmd string
 
+	// LogDir string `json:"log_dir"`
+
 	// TODO: multiple instances support
 	// TODO: multiple apps support
 	App App
@@ -108,6 +110,15 @@ type App struct {
 	RestartScript string
 }
 
+type Tasks []string
+
+func (t Tasks) String() string { return "" }
+func (t *Tasks) Set(s string) error {
+	// *t = append(*t, s)
+	migrations = append(migrations, newMigration(s))
+	return nil
+}
+
 var (
 	// TODO: move flags into Config
 	// verbose   bool
@@ -118,7 +129,6 @@ var (
 	noDeploy   bool
 	noFiles    bool
 	script     string
-	migration  string
 
 	softExclude bool
 	keepCache   bool
@@ -136,6 +146,9 @@ var (
 	versionf   bool
 
 	buildArgs string
+
+	tasks      Tasks
+	migrations []Migration
 
 	allf bool
 
@@ -190,16 +203,22 @@ func main() {
 
 	flag.IntVar(&syncFileLimit, "sync-queue-size", 5, "set file syncing queue size.")
 
-	flag.StringVar(&migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
+	// flag.StringVar(&migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
 	// flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
+
+	flag.Var(&tasks, "run", "run go scripts/packages on remote server.")
+
 	flag.Parse()
 
 	if versionf {
-		fmt.Printf("0.3.%d\n", version)
+		fmt.Printf("0.4.%d.dev\n", version)
 		return
 	}
 
 	args := flag.Args()
+	if len(migrations) > 0 {
+		args = append(args, "run")
+	}
 	if len(args) == 0 || help {
 		printUsage()
 		return
@@ -230,11 +249,11 @@ func main() {
 		deploy(servers)
 	case "migrate", "run":
 		// TODO: could specify to run on all servers
-		migrations := retrieveMigrations(args[1:])
+		// migrations := retrieveMigrations(args[1:])
 		// var server = cfg.Servers[serverSets[0]][0]
 		migrate(servers, migrations)
 	case "info":
-		inspect(servers)
+		info(servers)
 	case "log":
 		toTailLog = true
 	case "restart":
@@ -415,7 +434,7 @@ func syncFiles() {
 }
 
 // TODO: use buffer
-func inspect(servers []*Server) {
+func info(servers []*Server) {
 	var wg sync.WaitGroup
 	for _, serv := range servers {
 		wg.Add(1)
@@ -457,6 +476,7 @@ func parseCfg(configPath string) (cfg Config) {
 
 	for k, set := range cfg.Servers {
 		for _, s := range set {
+			s.Config = &cfg
 			s.Set = k
 			if s.User == "" {
 				fmt.Printf("%s contains server with empty user name\n", k)

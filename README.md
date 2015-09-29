@@ -148,19 +148,19 @@ You can specify server or server sets on which your migration need to be execute
 Simple:
 
 ```
-harp -server app@192.168.59.103:49153 run migration.go
+harp -server app@192.168.59.103:49153 -run migration.go
 ```
 
 With env and arguments:
 
 ```
-harp -server app@192.168.59.103:49153 run "AppEnv=prod migration2.go -arg1 val1 -arg2 val2"
+harp -server app@192.168.59.103:49153 -run "AppEnv=prod migration2.go -arg1 val1 -arg2 val2"
 ```
 
 Multiple migrations:
 
 ```
-harp -server app@192.168.59.103:49153 run migration.go "AppEnv=prod migration2.go -arg1 val1 -arg2 val2"
+harp -server app@192.168.59.103:49153 -run migration.go -run "AppEnv=prod migration2.go -arg1 val1 -arg2 val2"
 ```
 
 __Note__: Harp saved the current migration files in `$HOME/harp/{{.App.Name}}/migrations.tar.gz`. You can uncompress it and execute the binary manually if you prefer or on special occasions.

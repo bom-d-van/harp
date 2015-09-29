@@ -22,6 +22,7 @@
 			"ID":   "pluto",
 			"User": "app",
 			"Host": "192.168.59.103",
+			"envs": {"e1": "1"},
 			"Port": ":49153"
 		}, {
 			"ID":   "neptune",

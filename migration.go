@@ -159,7 +159,7 @@ func (s *Server) runMigration(migrations []Migration) {
 		envs += fmt.Sprintf("%s=%s ", k, v)
 	}
 	for i := range migrations {
-		migrations[i].Envs += migrations[i].Envs + " " + envs
+		migrations[i].Envs += " " + envs
 	}
 
 	session := s.getSession()
@@ -213,33 +213,37 @@ type Migration struct {
 	Args string
 }
 
+func newMigration(arg string) Migration {
+	var migration Migration
+	parts := strings.Split(arg, " ")
+	for index, part := range parts {
+		part = strings.TrimSpace(part)
+		if strings.Contains(part, "=") {
+			migration.Envs += part + " "
+		} else if doesFileExist(part) {
+			migration.File = part
+			migration.Base = filepath.Base(migration.File)
+			if len(parts) > index+1 {
+				migration.Args = strings.Join(parts[index+1:], " ")
+			}
+			break
+		} else {
+			migration.Envs += part + " "
+		}
+	}
+
+	if migration.File == "" {
+		exitf("can't retrieve migration file\n(migration file path DOES NOT allow SPACES)")
+	}
+
+	migration.Envs = strings.TrimSpace(migration.Envs)
+	return migration
+}
+
 // TODO: support file path containing spaces
 func retrieveMigrations(args []string) (ms []Migration) {
 	for _, arg := range args {
-		var migration Migration
-		parts := strings.Split(arg, " ")
-		for index, part := range parts {
-			part = strings.TrimSpace(part)
-			if strings.Contains(part, "=") {
-				migration.Envs += part + " "
-			} else if doesFileExist(part) {
-				migration.File = part
-				migration.Base = filepath.Base(migration.File)
-				if len(parts) > index+1 {
-					migration.Args = strings.Join(parts[index+1:], " ")
-				}
-				break
-			} else {
-				migration.Envs += part + " "
-			}
-		}
-
-		if migration.File == "" {
-			exitf("can't retrieve migration file\n(migration file path DOES NOT allow SPACES)")
-		}
-
-		migration.Envs = strings.Trim(migration.Envs, " ")
-		ms = append(ms, migration)
+		ms = append(ms, newMigration(arg))
 	}
 
 	return

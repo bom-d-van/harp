@@ -17,13 +17,13 @@ import (
 )
 
 type Server struct {
-	ID string // TODO
+	ID string
 
 	Envs   map[string]string
 	Home   string
 	GoPath string
 	LogDir string
-	PIDDir string
+	// PIDDir string
 
 	User string
 	Host string
@@ -32,6 +32,8 @@ type Server struct {
 	Set string // aka, Type
 
 	client *ssh.Client
+
+	Config *Config
 }
 
 // copy files into tmp/harp/
@@ -155,20 +157,51 @@ func (s *Server) syncFilesScript() (script string) {
 	return
 }
 
+func (s *Server) GetLogDir() string {
+	dir := s.LogDir
+	if dir == "" {
+		dir = fmt.Sprintf("%s/harp/%s/log", s.Home, cfg.App.Name)
+	}
+	return dir
+}
+
+func (s *Server) LogPath() string {
+	return filepath.Join(s.GetLogDir(), "app.log")
+}
+
+func (s *Server) PIDPath() string {
+	return fmt.Sprintf("%s/harp/%s/app.pid", s.Home, cfg.App.Name)
+}
+
+var restartScriptTmpl = template.Must(template.New("").Parse(`if [[ -f {{.PIDPath}} ]]; then
+	target=$(cat {{.PIDPath}});
+	if ps -p $target > /dev/null; then
+		kill -{{.Config.App.KillSig}} $target; > /dev/null 2>&1;
+	fi
+fi
+mkdir -p {{.GetLogDir}}
+touch {{.LogPath}}
+`))
+
 func (s *Server) restartScript() (script string) {
 	// gopath := s.getGoPath()
 	s.initPathes()
 	app := cfg.App
-	log := fmt.Sprintf("%s/harp/%s/app.log", s.Home, app.Name)
-	pid := fmt.Sprintf("%s/harp/%s/app.pid", s.Home, app.Name)
-	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
-	target=$(cat %[1]s);
-	if ps -p $target > /dev/null; then
-		kill -%[4]s $target; > /dev/null 2>&1;
-	fi
-fi
-touch %[2]s
-`, pid, log, app.Name, app.KillSig)
+	log := s.LogPath()
+	pid := s.PIDPath()
+	// 	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
+	// 	target=$(cat %[1]s);
+	// 	if ps -p $target > /dev/null; then
+	// 		kill -%[4]s $target; > /dev/null 2>&1;
+	// 	fi
+	// fi
+	// touch %[2]s
+	// `, pid, log, app.Name, app.KillSig)
+	var buf bytes.Buffer
+	if err := restartScriptTmpl.Execute(&buf, s); err != nil {
+		exitf("failed to execute restartScriptTmpl: %s", err)
+	}
+	script += buf.String()
 
 	envs := fmt.Sprintf(`%s=%q`, "GOPATH", s.GoPath)
 	for k, v := range app.Envs {

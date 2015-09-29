@@ -21,7 +21,7 @@ func tailLog(servers []*Server, beginLineNum int) {
 			session.Stdout = logger
 			session.Stderr = logger
 
-			if err := session.Start(fmt.Sprintf("tail -f -n %d %s/harp/%s/app.log", beginLineNum, serv.Home, cfg.App.Name)); err != nil {
+			if err := session.Start(fmt.Sprintf("tail -f -n %d %s", beginLineNum, serv.LogPath())); err != nil {
 				exitf("tail -f harp/%s/app.log error: %s", cfg.App, err)
 			}
 
