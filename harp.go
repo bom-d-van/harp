@@ -30,7 +30,6 @@ import (
 // KISS
 // BC (Being Convinent: all things in one place)
 
-// TODO: put everything inside app path
 // local
 // 	pwd/.harp/files
 // 	pwd/.harp/migration
@@ -433,7 +432,6 @@ func syncFiles() {
 	wg.Wait()
 }
 
-// TODO: use buffer
 func info(servers []*Server) {
 	var wg sync.WaitGroup
 	for _, serv := range servers {
@@ -446,8 +444,7 @@ func info(servers []*Server) {
 			if err != nil {
 				exitf("failed to cat %s.info on %s: %s(%s)", cfg.App.Name, serv, err, string(output))
 			}
-			fmt.Println("=====", serv.String())
-			fmt.Println(string(output))
+			fmt.Printf("=====\n%s\n%s", serv.String(), output)
 		}(serv)
 	}
 	wg.Wait()
