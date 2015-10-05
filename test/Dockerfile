@@ -12,7 +12,11 @@ RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so
 ENV NOTVISIBLE "in users profile"
 RUN echo "export VISIBLE=now" >> /etc/profile
 
-RUN useradd -ou 0 -g 0 app
+RUN locale-gen en_US.UTF-8
+
+RUN adduser --disabled-password --gecos "" app
+RUN ssh-keygen -q -t rsa -N '' -f /id_rsa
+RUN apt-get install rsync
 
 # TODO: generate ssh keys
 
