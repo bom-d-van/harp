@@ -91,7 +91,6 @@ type App struct {
 
 	DefaultExcludeds []string
 	Files            []File
-	// Files []string
 
 	Args []string
 	Envs map[string]string
@@ -104,7 +103,6 @@ type App struct {
 	// Default: 1MB
 	FileWarningSize int64
 
-	// TODO: could override default deploy script for out-of-band deploy
 	DeployScript  string
 	RestartScript string
 }
@@ -113,22 +111,22 @@ type Tasks []string
 
 func (t Tasks) String() string { return "" }
 func (t *Tasks) Set(s string) error {
-	// *t = append(*t, s)
 	migrations = append(migrations, newMigration(s))
 	return nil
 }
 
 var (
-	// TODO: move flags into Config
-	// verbose   bool
 	option = struct {
 		configPath string
-		debug      bool
-		noBuild    bool
-		noUpload   bool
-		noDeploy   bool
-		noFiles    bool
-		script     string
+
+		debug bool
+		// verbose   bool
+
+		noBuild  bool
+		noUpload bool
+		noDeploy bool
+		noFiles  bool
+		script   string
 
 		softExclude bool
 		keepCache   bool
@@ -246,7 +244,6 @@ func main() {
 
 	switch args[0] {
 	case "kill":
-		// TODO
 		kill(servers)
 	case "deploy":
 		deploy(servers)
@@ -787,6 +784,7 @@ func kill(servers []*Server) {
 			if err != nil {
 				exitf("failed to exec %s: %s %s", option.script, string(output), err)
 			}
+			log.Printf("%s killed\n", s)
 		}(server)
 	}
 	wg.Wait()
