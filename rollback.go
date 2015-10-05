@@ -35,7 +35,7 @@ func rollback(servers []*Server, version string) {
 		fmt.Printf("%s rollback start\n", s.String())
 		s.initPathes()
 		session := s.getSession()
-		if debugf {
+		if option.debug {
 			fmt.Println(s.retrieveRollbackScript())
 		}
 		output, err := session.CombinedOutput(fmt.Sprintf("%s/harp/%s/rollback.sh %s", s.Home, cfg.App.Name, version))
@@ -59,7 +59,7 @@ func (s *Server) trimOldReleases() {
 	for _, release := range releases[:len(releases)-cfg.RollbackCount] {
 		session := s.getSession()
 		script := fmt.Sprintf("rm -rf %s/harp/%s/releases/%s", s.Home, cfg.App.Name, release)
-		if debugf {
+		if option.debug {
 			fmt.Printf("%s: %s\n", s, script)
 		}
 		output, err := session.CombinedOutput(script)

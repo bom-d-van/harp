@@ -49,7 +49,7 @@ func copyFile(dst, src string) {
 	localFiles[dst] = fi
 	localFilesMux.Unlock()
 
-	if debugf {
+	if option.debug {
 		log.Println(src, stat.Mode())
 	}
 	if stat.Size() > cfg.App.FileWarningSize {

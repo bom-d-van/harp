@@ -20,7 +20,7 @@ func migrate(servers []*Server, migrations []Migration) {
 	defer initTmpDir()()
 	cmd("mkdir", "-p", tmpDir+"/migrations")
 
-	if !noBuild {
+	if !option.noBuild {
 		println("building")
 		for _, migration := range migrations {
 			// cmd("go", "build", "-o", tmpDir+"/migrations/"+migration.Base, migration.File)
@@ -32,7 +32,7 @@ func migrate(servers []*Server, migrations []Migration) {
 				build = fmt.Sprintf(cfg.App.BuildCmd, output, migration.File)
 			}
 
-			if debugf {
+			if option.debug {
 				println("build cmd:", build)
 			}
 			cmd("sh", "-c", build)
@@ -46,12 +46,12 @@ func migrate(servers []*Server, migrations []Migration) {
 	wg.Add(len(servers))
 	for _, server := range servers {
 		go func(server *Server) {
-			if !noUpload {
+			if !option.noUpload {
 				println(server.String(), "uploading")
 				server.uploadMigration(migrations)
 			}
 
-			if !noDeploy {
+			if !option.noDeploy {
 				println(server.String(), "running")
 				server.runMigration(migrations)
 			}
@@ -181,7 +181,7 @@ func (s *Server) runMigration(migrations []Migration) {
 		exitf("failed to generate migration script: %s", err)
 	}
 
-	if debugf {
+	if option.debug {
 		println(script.String())
 	}
 

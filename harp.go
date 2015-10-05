@@ -44,7 +44,7 @@ import (
 // 	$HOME/harp/$APP/script
 
 func init() {
-	if debugf {
+	if option.debug {
 		log.SetFlags(log.Lshortfile)
 	} else {
 		log.SetFlags(0)
@@ -121,35 +121,38 @@ func (t *Tasks) Set(s string) error {
 var (
 	// TODO: move flags into Config
 	// verbose   bool
-	configPath string
-	debugf     bool
-	noBuild    bool
-	noUpload   bool
-	noDeploy   bool
-	noFiles    bool
-	script     string
+	option = struct {
+		configPath string
+		debug      bool
+		noBuild    bool
+		noUpload   bool
+		noDeploy   bool
+		noFiles    bool
+		script     string
 
-	softExclude bool
-	keepCache   bool
+		softExclude bool
+		keepCache   bool
 
-	toTailLog        bool
-	tailBeginLineNum int
+		toTailLog        bool
+		tailBeginLineNum int
 
-	syncFileLimit int
+		syncFileLimit int
 
-	// TODO: can specify a single server, instead of the whole server set
-	server     string
-	serverSet  string
-	serverSets []string
-	help       bool
-	versionf   bool
+		// TODO: can specify a single server, instead of the whole server set
+		server     string
+		serverSet  string
+		serverSets []string
+		help       bool
+		version    bool
 
-	buildArgs string
+		buildArgs string
 
-	tasks      Tasks
+		all bool
+
+		tasks Tasks
+	}{}
+
 	migrations []Migration
-
-	allf bool
 
 	cfg     Config
 	GoPaths = strings.Split(os.Getenv("GOPATH"), ":")
@@ -159,57 +162,58 @@ var (
 var tmpDir = ".harp"
 
 func main() {
-	flag.StringVar(&configPath, "c", "harp.json", "config file path")
+	flag.StringVar(&option.configPath, "c", "harp.json", "config file path")
 
-	flag.BoolVar(&debugf, "debug", false, "print debug info")
+	flag.BoolVar(&option.debug, "debug", false, "print debug info")
 	// flag.BoolVar(&verbose, "v", false, "verbose")
 
-	flag.BoolVar(&noBuild, "nb", false, "no build")
-	flag.BoolVar(&noBuild, "no-build", false, "no build")
+	flag.BoolVar(&option.noBuild, "nb", false, "no build")
+	flag.BoolVar(&option.noBuild, "no-build", false, "no build")
 
-	flag.BoolVar(&noUpload, "nu", false, "no upload")
-	flag.BoolVar(&noUpload, "no-upload", false, "no upload")
+	flag.BoolVar(&option.noUpload, "nu", false, "no upload")
+	flag.BoolVar(&option.noUpload, "no-upload", false, "no upload")
 
-	flag.BoolVar(&noDeploy, "nd", false, "no deploy")
-	flag.BoolVar(&noDeploy, "no-deploy", false, "no deploy")
-	flag.BoolVar(&noDeploy, "nr", false, "no run (same as -no-deploy)")
-	flag.BoolVar(&noDeploy, "no-run", false, "no run (same as -no-deploy)")
+	flag.BoolVar(&option.noDeploy, "nd", false, "no deploy")
+	flag.BoolVar(&option.noDeploy, "no-deploy", false, "no deploy")
+	flag.BoolVar(&option.noDeploy, "nr", false, "no run (same as -no-deploy)")
+	flag.BoolVar(&option.noDeploy, "no-run", false, "no run (same as -no-deploy)")
 
-	flag.BoolVar(&noFiles, "nf", false, "no files")
-	flag.BoolVar(&noFiles, "no-files", false, "no files")
+	flag.BoolVar(&option.noFiles, "nf", false, "no files")
+	flag.BoolVar(&option.noFiles, "no-files", false, "no files")
 
-	flag.BoolVar(&toTailLog, "log", false, "tail log after deploy")
-	flag.IntVar(&tailBeginLineNum, "n", 32, "tail log tail localtion line number (tail -n 32)")
+	flag.BoolVar(&option.toTailLog, "log", false, "tail log after deploy")
+	flag.IntVar(&option.tailBeginLineNum, "n", 32, "tail log tail localtion line number (tail -n 32)")
 
-	flag.BoolVar(&help, "help", false, "print helps")
-	flag.BoolVar(&help, "h", false, "print helps")
-	flag.BoolVar(&versionf, "v", false, "print version num")
-	flag.BoolVar(&versionf, "version", false, "print version num")
+	flag.BoolVar(&option.help, "help", false, "print helps")
+	flag.BoolVar(&option.help, "h", false, "print helps")
 
-	flag.BoolVar(&softExclude, "soft-exclude", false, "use strings.Contains to exclude files")
-	flag.BoolVar(&keepCache, "cache", false, "cache data in .harp")
+	flag.BoolVar(&option.version, "v", false, "print version num")
+	flag.BoolVar(&option.version, "version", false, "print version num")
 
-	flag.StringVar(&buildArgs, "build-args", "", "build args speicified for building your programs. (default -a -v)")
+	flag.BoolVar(&option.softExclude, "soft-exclude", false, "use strings.Contains to exclude files")
+	flag.BoolVar(&option.keepCache, "cache", false, "cache data in .harp")
 
-	// flag.StringVar(&script, "scripts", "", "scripts to build and run on server")
+	flag.StringVar(&option.buildArgs, "build-args", "", "build args speicified for building your programs. (default -a -v)")
 
-	flag.StringVar(&serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
-	flag.StringVar(&serverSet, "server-set", "", "specify server sets to deploy, multiple sets are split by comma")
+	// flag.StringVar(&option.script, "scripts", "", "scripts to build and run on server")
 
-	flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
+	flag.StringVar(&option.serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
+	flag.StringVar(&option.serverSet, "server-set", "", "specify server sets to deploy, multiple sets are split by comma")
 
-	flag.BoolVar(&allf, "all", false, "execute action on all server")
+	flag.StringVar(&option.server, "server", "", "specify servers to deploy, multiple servers are split by comma")
 
-	flag.IntVar(&syncFileLimit, "sync-queue-size", 5, "set file syncing queue size.")
+	flag.BoolVar(&option.all, "all", false, "execute action on all server")
 
-	// flag.StringVar(&migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
-	// flag.StringVar(&server, "server", "", "specify servers to deploy, multiple servers are split by comma")
+	flag.IntVar(&option.syncFileLimit, "sync-queue-size", 5, "set file syncing queue size.")
 
-	flag.Var(&tasks, "run", "run go scripts/packages on remote server.")
+	// flag.StringVar(&option.migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
+	// flag.StringVar(&option.server, "server", "", "specify servers to deploy, multiple servers are split by comma")
+
+	flag.Var(&option.tasks, "run", "run go scripts/packages on remote server.")
 
 	flag.Parse()
 
-	if versionf {
+	if option.version {
 		fmt.Printf("0.4.%d.dev\n", version)
 		return
 	}
@@ -218,7 +222,7 @@ func main() {
 	if len(migrations) > 0 {
 		args = append(args, "run")
 	}
-	if len(args) == 0 || help {
+	if len(args) == 0 || option.help {
 		printUsage()
 		return
 	}
@@ -228,12 +232,12 @@ func main() {
 		initHarp()
 		return
 	case "clean":
-		keepCache = false
+		option.keepCache = false
 		cleanCaches()
 		return
 	}
 
-	cfg = parseCfg(configPath)
+	cfg = parseCfg(option.configPath)
 
 	var servers []*Server
 	if args[0] != "cross-compile" && args[0] != "xc" {
@@ -254,10 +258,10 @@ func main() {
 	case "info":
 		info(servers)
 	case "log":
-		toTailLog = true
+		option.toTailLog = true
 	case "restart":
-		noBuild = true
-		noUpload = true
+		option.noBuild = true
+		option.noUpload = true
 		deploy(servers)
 	case "inspect":
 		inspectScript(servers, args[1])
@@ -278,13 +282,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if toTailLog {
-		if !keepCache {
+	if option.toTailLog {
+		if !option.keepCache {
 			if err := os.RemoveAll(tmpDir); err != nil {
 				exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
 			}
 		}
-		tailLog(servers, tailBeginLineNum)
+		tailLog(servers, option.tailBeginLineNum)
 	}
 }
 
@@ -302,12 +306,12 @@ func deploy(servers []*Server) {
 	defer initTmpDir()()
 
 	info := getBuildLog()
-	if !noBuild {
+	if !option.noBuild {
 		log.Println("building")
 		build()
 	}
 
-	if !noUpload {
+	if !option.noUpload {
 		syncFiles()
 	}
 
@@ -316,7 +320,7 @@ func deploy(servers []*Server) {
 		wg.Add(1)
 		go func(server *Server) {
 			defer wg.Done()
-			if !noUpload {
+			if !option.noUpload {
 				diff := server.diffFiles()
 				if diff != "" {
 					diff = "diff: \n" + diff
@@ -325,7 +329,7 @@ func deploy(servers []*Server) {
 				server.upload(info)
 			}
 
-			if !noDeploy {
+			if !option.noDeploy {
 				log.Printf("deploying: [%s] %s\n", server.Set, server)
 				server.deploy()
 			}
@@ -364,7 +368,7 @@ func syncFiles() {
 			if fi, err := os.Stat(src); err != nil {
 				exitf("os.Stat(%s) error: %s", src, err)
 			} else if fi.IsDir() {
-				if debugf {
+				if option.debug {
 					log.Println(dst, fi.Mode())
 				}
 				if err := os.Mkdir(dst, fi.Mode()); err != nil {
@@ -394,7 +398,7 @@ func syncFiles() {
 					if err != nil {
 						exitf("filepath.Match(%s, %s) error: %s", e, rel, err)
 					}
-					if !matched && !softExclude {
+					if !matched && !option.softExclude {
 						matched = strings.Contains(rel, e)
 					}
 					if matched {
@@ -407,7 +411,7 @@ func syncFiles() {
 				}
 
 				if info.IsDir() {
-					if debugf {
+					if option.debug {
 						log.Println(filepath.Join(dst, rel), info.Mode())
 					}
 					if err := os.Mkdir(filepath.Join(dst, rel), info.Mode()); err != nil {
@@ -583,7 +587,7 @@ func tryCmd(name string, args ...string) string {
 	cmd.Env = append(cmd.Env, "GOOS="+cfg.GOOS, "GOARCH="+cfg.GOARCH)
 
 	output, err := cmd.CombinedOutput()
-	if err != nil && debugf {
+	if err != nil && option.debug {
 		log.Printf("faied to run %s %s: %s(%s)\n", name, args, err, string(output))
 	}
 
@@ -598,18 +602,18 @@ func build() {
 	if ba == "" {
 		ba = "-a -v"
 	}
-	if buildArgs != "" {
-		ba = buildArgs
+	if option.buildArgs != "" {
+		ba = option.buildArgs
 	}
 	buildCmd := fmt.Sprintf("go build %s -o %s %s", ba, boutput, app.ImportPath)
 	if app.BuildCmd != "" {
 		buildCmd = fmt.Sprintf(app.BuildCmd, boutput, app.ImportPath)
 	}
-	if debugf {
+	if option.debug {
 		println("build cmd:", buildCmd)
 	}
 	output := cmd("sh", "-c", buildCmd)
-	if debugf {
+	if option.debug {
 		print(output)
 	}
 }
@@ -661,7 +665,7 @@ examples:
 
 func retrieveServers() []*Server {
 	var serverSets []string
-	for _, set := range strings.Split(serverSet, ",") {
+	for _, set := range strings.Split(option.serverSet, ",") {
 		set = strings.TrimSpace(set)
 		if set == "" {
 			continue
@@ -670,7 +674,7 @@ func retrieveServers() []*Server {
 	}
 
 	var servers []string
-	for _, server := range strings.Split(server, ",") {
+	for _, server := range strings.Split(option.server, ",") {
 		server = strings.TrimSpace(server)
 		if server == "" {
 			continue
@@ -678,13 +682,13 @@ func retrieveServers() []*Server {
 		servers = append(servers, server)
 	}
 
-	if allf {
+	if option.all {
 		for set, _ := range cfg.Servers {
 			serverSets = append(serverSets, set)
 		}
 	}
 
-	if server == "" && serverSet == "" {
+	if option.server == "" && option.serverSet == "" {
 		println("please specify servers or server sets to deploy (-s or -server).")
 		println("specify -all flag to execute the action on all servers.")
 		os.Exit(1)
@@ -715,7 +719,7 @@ serversLoop:
 				}
 			}
 		}
-		println("can't find server:", server)
+		println("unknown server:", server)
 		os.Exit(1)
 	}
 
@@ -792,7 +796,7 @@ func kill(servers []*Server) {
 			defer session.Close()
 			output, err := session.CombinedOutput(s.retrieveKillScript())
 			if err != nil {
-				exitf("failed to exec %s: %s %s", script, string(output), err)
+				exitf("failed to exec %s: %s %s", option.script, string(output), err)
 			}
 		}(server)
 	}
@@ -808,7 +812,7 @@ func (s *Server) retrieveKillScript() string {
 	}{Config: cfg, Server: s}); err != nil {
 		exitf(err.Error())
 	}
-	if debugf {
+	if option.debug {
 		fmt.Println(buf.String())
 	}
 	return buf.String()
@@ -837,7 +841,7 @@ func initXC() {
 }
 
 func cleanCaches() {
-	if keepCache {
+	if option.keepCache {
 		return
 	}
 	if err := os.RemoveAll(tmpDir); err != nil {

@@ -46,17 +46,17 @@ func (s *Server) upload(info string) {
 
 	appName := cfg.App.Name
 	dst := fmt.Sprintf("%s@%s:%s/harp/%s/", s.User, s.Host, s.Home, appName)
-	// if debugf {
+	// if option.debug {
 	// 	fmt.Println("rsync", "-az", "--delete", "-e", ssh, filepath.Join(tmpDir, appName), filepath.Join(tmpDir, "files"), dst)
 	// }
 	args := []string{"-az", "--delete", "-e", ssh}
-	if debugf {
+	if option.debug {
 		args = append(args, "-P")
 	}
-	if !noBuild {
+	if !option.noBuild {
 		args = append(args, filepath.Join(tmpDir, appName))
 	}
-	if !noFiles {
+	if !option.noFiles {
 		args = append(args, filepath.Join(tmpDir, "files"))
 	}
 	cmd := exec.Command("rsync", append(args, dst)...)
@@ -76,7 +76,7 @@ func (s *Server) upload(info string) {
 }
 
 func (s *Server) deploy() {
-	// if debugf {
+	// if option.debug {
 	// 	log.Println("deplying", s.String())
 	// }
 
@@ -90,7 +90,7 @@ func (s *Server) deploy() {
 	defer session.Close()
 
 	script := s.retrieveDeployScript()
-	if debugf {
+	if option.debug {
 		fmt.Printf("%s", script)
 	}
 	if output, err := session.CombinedOutput(script); err != nil {
@@ -295,7 +295,7 @@ func (s *Server) retrieveRollbackScript() string {
 	if err := rollbackScriptTmpl.Execute(&buf, data); err != nil {
 		exitf(err.Error())
 	}
-	if debugf {
+	if option.debug {
 		fmt.Println(buf.String())
 	}
 	return buf.String()
