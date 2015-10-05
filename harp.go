@@ -477,18 +477,7 @@ func parseCfg(configPath string) (cfg Config) {
 
 	for k, set := range cfg.Servers {
 		for _, s := range set {
-			s.Config = &cfg
-			s.Set = k
-			if s.User == "" {
-				fmt.Printf("%s contains server with empty user name\n", k)
-				os.Exit(1)
-			} else if s.Host == "" {
-				fmt.Printf("%s contains server with empty host\n", k)
-				os.Exit(1)
-			}
-			if s.Port == "" {
-				s.Port = ":22"
-			}
+			s.init(k)
 		}
 	}
 

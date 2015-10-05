@@ -36,12 +36,27 @@ type Server struct {
 	Config *Config
 }
 
+func (s *Server) init(set string) {
+	s.Config = &cfg
+	s.Set = set
+	if s.User == "" {
+		fmt.Printf("%s contains server with empty user name\n", set)
+		os.Exit(1)
+	} else if s.Host == "" {
+		fmt.Printf("%s contains server with empty host\n", set)
+		os.Exit(1)
+	}
+	if s.Port == "" {
+		s.Port = ":22"
+	}
+
+	s.initSetUp()
+	s.initPathes()
+}
+
 // copy files into tmp/harp/
 // exclude files
 func (s *Server) upload(info string) {
-	s.initSetUp()
-	s.initPathes()
-
 	ssh := fmt.Sprintf(`ssh -l %s -p %s`, s.User, strings.TrimLeft(s.Port, ":"))
 
 	appName := cfg.App.Name
@@ -114,8 +129,6 @@ func (s *Server) scriptData() interface{} {
 }
 
 func (s *Server) syncFilesScript() (script string) {
-	// gopath := s.getGoPath()
-	s.initPathes()
 	script += fmt.Sprintf("mkdir -p %s/bin %s/src %s/src/%s\n", s.GoPath, s.GoPath, s.GoPath, cfg.App.ImportPath)
 
 	// TODO: handle callback error
@@ -184,8 +197,6 @@ touch {{.LogPath}}
 `))
 
 func (s *Server) restartScript() (script string) {
-	// gopath := s.getGoPath()
-	s.initPathes()
 	app := cfg.App
 	log := s.LogPath()
 	pid := s.PIDPath()
@@ -223,7 +234,6 @@ func (s *Server) saveReleaseScript() (script string) {
 		return
 	}
 
-	s.initPathes()
 	app := cfg.App
 	now := time.Now().Format("06-01-02-15:04:05")
 	script += fmt.Sprintf(`cd %s/harp/%s
@@ -263,7 +273,6 @@ const defaultDeployScript = `set -e
 `
 
 func (s *Server) saveScript(name, script string) {
-	s.initPathes()
 	session := s.getSession()
 	defer session.Close()
 	cmd := fmt.Sprintf(`cat <<EOF > %s/harp/%s/%s.sh
@@ -279,7 +288,6 @@ chmod +x %s/harp/%s/%s.sh
 }
 
 func (s *Server) retrieveRollbackScript() string {
-	s.initPathes()
 	data := struct {
 		Config
 		*Server
@@ -426,8 +434,6 @@ func (s *Server) initSetUp() {
 
 // TODO: add test
 func (s *Server) diffFiles() string {
-	s.initPathes()
-
 	session := s.getSession()
 	fileRoot := fmt.Sprintf("%s/harp/%s/files/", s.Home, cfg.App.Name)
 	cmd := fmt.Sprintf(`if [[ -d "%s/harp/%s/" ]]; then
