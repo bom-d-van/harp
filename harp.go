@@ -229,7 +229,7 @@ func main() {
 	flag.Parse()
 
 	if option.version {
-		fmt.Printf("0.4.%d.dev\n", version)
+		printVersion()
 		return
 	}
 
@@ -748,4 +748,8 @@ func cleanCaches() {
 	if err := os.RemoveAll(tmpDir); err != nil {
 		exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
 	}
+}
+
+func printVersion() {
+	fmt.Printf("0.4.%d\n", version)
 }
