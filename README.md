@@ -2,6 +2,8 @@
 
 A go application deploy tool (or an easy way to start a daemon or to run go programs on remote servers).
 
+Note: even though harp is designed to be a local tool. You can use it in your build server and include harp as part of your build script.
+
 ## What harp does
 
 Harp simply builds your application and upload it to your server. It brings you a complete solution for deploying common applications. It syncs, restarts, kills, and deploys your applications.
