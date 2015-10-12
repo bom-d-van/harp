@@ -90,6 +90,7 @@ type App struct {
 	Name       string
 	ImportPath string
 
+	NoRelMatch       bool
 	DefaultExcludeds []string
 	Files            []File
 

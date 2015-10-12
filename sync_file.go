@@ -72,6 +72,13 @@ func syncFiles() {
 					if !matched && !option.softExclude {
 						matched = strings.Contains(rel, e)
 					}
+					// TODO: add test
+					if !matched && !cfg.App.NoRelMatch && !info.IsDir() {
+						matched, err = filepath.Match(e, filepath.Base(rel))
+						if err != nil {
+							exitf("filepath.Match(%s, filepath.Base(%s)) error: %s", e, rel, err)
+						}
+					}
 					if matched {
 						if info.IsDir() {
 							return filepath.SkipDir
