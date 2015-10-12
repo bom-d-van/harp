@@ -6,14 +6,17 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
 
 	"github.com/cheggaaa/pb"
+	"golang.org/x/crypto/ssh"
 )
 
 func migrate(servers []*Server, migrations []Migration) {
@@ -151,9 +154,6 @@ GOPATH="{{$gopath}}" {{.Envs}} {{$home}}/harp/{{$app}}/migration/{{.Base}} {{.Ar
 // 2>&1 | tee -a {{$home}}/harp/{{$app}}/migration.log
 
 func (s *Server) runMigration(migrations []Migration) {
-	// TODO: to refactor
-	s.initPathes()
-
 	var envs string
 	for k, v := range s.Envs {
 		envs += fmt.Sprintf("%s=%s ", k, v)
@@ -181,11 +181,25 @@ func (s *Server) runMigration(migrations []Migration) {
 		exitf("failed to generate migration script: %s", err)
 	}
 
-	if option.debug {
-		println(script.String())
+	if option.debug || option.hand {
+		log.Printf("===============\n%s\n%s", s, trimEmptyLines(script.String()))
+		if option.hand {
+			return
+		}
 	}
 
-	// TODO: refactor
+	logSession(session)
+
+	if err := session.Run(script.String()); err != nil {
+		exitf("failed at runing script: %s\n%s", err, script)
+	}
+}
+
+func trimEmptyLines(text string) string {
+	return regexp.MustCompile("\n+").ReplaceAllString(text, "\n")
+}
+
+func logSession(session *ssh.Session) {
 	{
 		r, err := session.StdoutPipe()
 		if err != nil {
@@ -199,10 +213,6 @@ func (s *Server) runMigration(migrations []Migration) {
 			exitf("failed to get StderrPipe: %s", err)
 		}
 		go io.Copy(os.Stderr, r)
-	}
-
-	if err := session.Run(script.String()); err != nil {
-		exitf("failed at runing script: %s\n%s", err, script)
 	}
 }
 

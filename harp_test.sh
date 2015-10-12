@@ -67,11 +67,11 @@ tmp/harp -c test/harp2.json -s prod -run github.com/bom-d-van/harp/test/migratio
 echo ====================
 echo tmp/harp -c test/harp.json -s prod rollback ls
 for version in `tmp/harp -c test/harp.json -s prod rollback ls | tail -2`; do
-	echo rollback version: $version
+	echo "tmp/harp -c test/harp.json -s prod rollback $version"
 	tmp/harp -c test/harp.json -s prod rollback $version
-	ssh app@$dmip -p 49153 -- cat /home/app/harp/app/log/app.log
+	ssh app@$dmip -p 49153 -- tail /home/app/harp/app/log/app.log
 	# ssh app@$dmip -p 49153 -- cat /home/app/src/github.com/bom-d-van/harp/test/files/file1
-	ssh app@$dmip -p 49153 -- cat /home/app/src/github.com/bom-d-van/harp/test/files/file2
+	# ssh app@$dmip -p 49153 -- cat /home/app/src/github.com/bom-d-van/harp/test/files/file2
 done
 
 git checkout -- test/test_version.go test/files/file1 test/files/file2

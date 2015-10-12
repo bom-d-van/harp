@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -34,6 +37,27 @@ type Server struct {
 	client *ssh.Client
 
 	Config *Config
+}
+
+var urlRegexp = regexp.MustCompile(`(?P<user>[^@]+)@(?P<host>[^:]+):(?P<port>.*)`)
+var testMode bool
+
+func newOneShotServer(url string) *Server {
+	log.Println(url)
+	if !urlRegexp.MatchString(url) {
+		return nil
+	}
+	matches := urlRegexp.FindStringSubmatch(url)
+	var s Server
+	s.User = matches[1]
+	s.Host = matches[2]
+	s.Port = ":" + matches[3]
+
+	if !testMode {
+		s.init("")
+	}
+
+	return &s
 }
 
 func (s *Server) init(set string) {
@@ -229,18 +253,21 @@ func (s *Server) restartScript() (script string) {
 	return
 }
 
+var releaseTsOnce sync.Once
+var releaseTs string
+
 func (s *Server) saveReleaseScript() (script string) {
 	if cfg.NoRollback {
 		return
 	}
 
-	app := cfg.App
-	now := time.Now().Format("06-01-02-15:04:05")
+	releaseTsOnce.Do(func() { releaseTs = time.Now().Format("06-01-02-15:04:05") })
+
 	script += fmt.Sprintf(`cd %s/harp/%s
 if [[ -f harp-build.info ]]; then
 	mkdir -p releases/%s
 	cp -rf %s harp-build.info files kill.sh restart.sh rollback.sh releases/%s
-fi`, s.Home, app.Name, now, cfg.App.Name, now)
+fi`, s.Home, cfg.App.Name, releaseTs, cfg.App.Name, releaseTs)
 	return
 }
 

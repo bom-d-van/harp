@@ -44,6 +44,7 @@ import (
 // 	$HOME/harp/$APP/script
 
 func init() {
+	log.SetOutput(os.Stdout)
 	if option.debug {
 		log.SetFlags(log.Lshortfile)
 	} else {
@@ -115,6 +116,14 @@ func (t *Tasks) Set(s string) error {
 	return nil
 }
 
+type FlagStrings []string
+
+func (t FlagStrings) String() string { return "" }
+func (t *FlagStrings) Set(s string) error {
+	*t = append(*t, s)
+	return nil
+}
+
 var (
 	option = struct {
 		configPath string
@@ -137,9 +146,8 @@ var (
 		syncFileLimit int
 
 		// TODO: can specify a single server, instead of the whole server set
-		server     string
-		serverSet  string
-		serverSets []string
+		servers    FlagStrings
+		serverSets FlagStrings
 		help       bool
 		version    bool
 
@@ -147,7 +155,12 @@ var (
 
 		all bool
 
+		deploy string
+
 		tasks Tasks
+		hand  bool
+
+		cli bool
 	}{}
 
 	migrations []Migration
@@ -195,10 +208,10 @@ func main() {
 
 	// flag.StringVar(&option.script, "scripts", "", "scripts to build and run on server")
 
-	flag.StringVar(&option.serverSet, "s", "", "specify server sets to deploy, multiple sets are split by comma")
-	flag.StringVar(&option.serverSet, "server-set", "", "specify server sets to deploy, multiple sets are split by comma")
+	flag.Var(&option.serverSets, "s", "specify server sets to deploy, multiple sets are split by comma")
+	flag.Var(&option.serverSets, "server-set", "specify server sets to deploy, multiple sets are split by comma")
 
-	flag.StringVar(&option.server, "server", "", "specify servers to deploy, multiple servers are split by comma")
+	flag.Var(&option.servers, "server", "specify servers to deploy, multiple servers are split by comma")
 
 	flag.BoolVar(&option.all, "all", false, "execute action on all server")
 
@@ -207,7 +220,10 @@ func main() {
 	// flag.StringVar(&option.migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
 	// flag.StringVar(&option.server, "server", "", "specify servers to deploy, multiple servers are split by comma")
 
+	flag.StringVar(&option.deploy, "deploy", "", "deploy app to servers/sets")
+
 	flag.Var(&option.tasks, "run", "run go scripts/packages on remote server.")
+	flag.BoolVar(&option.hand, "hand", false, "pirnt out shell scripts could be executed by hand on remote servers")
 
 	flag.Parse()
 
@@ -216,16 +232,19 @@ func main() {
 		return
 	}
 
+	var action string
 	args := flag.Args()
-	if len(migrations) > 0 {
-		args = append(args, "run")
-	}
-	if len(args) == 0 || option.help {
+	switch {
+	case len(migrations) > 0:
+		action = "run"
+	case len(args) > 0:
+		action = args[0]
+	case len(args) == 0 || option.help:
 		printUsage()
 		return
 	}
 
-	switch args[0] {
+	switch action {
 	case "init":
 		initHarp()
 		return
@@ -238,19 +257,22 @@ func main() {
 	cfg = parseCfg(option.configPath)
 
 	var servers []*Server
-	if args[0] != "cross-compile" && args[0] != "xc" {
+	if action != "cross-compile" && action != "xc" {
 		servers = retrieveServers()
 	}
 
-	switch args[0] {
+	switch action {
 	case "kill":
 		kill(servers)
 	case "deploy":
 		deploy(servers)
 	case "migrate", "run":
 		// TODO: could specify to run on all servers
-		// migrations := retrieveMigrations(args[1:])
-		// var server = cfg.Servers[serverSets[0]][0]
+		if len(migrations) == 0 {
+			log.Println("run command is deprecated. please use flag: -run.")
+			log.Println("e.g. harp -s prod -run file.go -run file2.go")
+			os.Exit(1)
+		}
 		migrate(servers, migrations)
 	case "info":
 		info(servers)
@@ -336,103 +358,6 @@ func deploy(servers []*Server) {
 	wg.Wait()
 }
 
-func syncFiles() {
-	log.Println("syncing files")
-	if err := os.MkdirAll(filepath.Join(tmpDir, "files"), 0755); err != nil {
-		exitf("os.MkdirAll(.harp/files) error: %s", err)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(cfg.App.Files))
-	for _, file := range cfg.App.Files {
-		go func(f File) {
-			defer func() { wg.Done() }()
-			var src, gopath string
-			for _, gopath = range GoPaths {
-				src = filepath.Join(gopath, "src", f.Path)
-				if _, err := os.Stat(src); err != nil {
-					src = ""
-					continue
-				}
-
-				break
-			}
-			if src == "" {
-				exitf("failed to find %s from %s", f.Path, GoPaths)
-			}
-
-			dst := filepath.Join(tmpDir, "files", strings.Replace(f.Path, "/", "_", -1))
-			if fi, err := os.Stat(src); err != nil {
-				exitf("os.Stat(%s) error: %s", src, err)
-			} else if fi.IsDir() {
-				if option.debug {
-					log.Println(dst, fi.Mode())
-				}
-				if err := os.Mkdir(dst, fi.Mode()); err != nil {
-					exitf("os.Mkdir(%s) error: %s", dst, err)
-				}
-			} else {
-				// a single file speicified in Files.
-				copyFile(dst, src)
-			}
-
-			// handle directory here
-			base := filepath.Join(gopath, "src", f.Path)
-			err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					exitf("walk %s: %s", path, err)
-				} else if path == base {
-					return nil
-				}
-
-				rel, err := filepath.Rel(base, path)
-				if err != nil {
-					exitf("fielpath.Rel(%s, %s) error: %s", base, path, err)
-				}
-
-				for _, e := range append(cfg.App.DefaultExcludeds, f.Excludeds...) {
-					matched, err := filepath.Match(e, rel)
-					if err != nil {
-						exitf("filepath.Match(%s, %s) error: %s", e, rel, err)
-					}
-					if !matched && !option.softExclude {
-						matched = strings.Contains(rel, e)
-					}
-					if matched {
-						if info.IsDir() {
-							return filepath.SkipDir
-						} else {
-							return nil
-						}
-					}
-				}
-
-				if info.IsDir() {
-					if option.debug {
-						log.Println(filepath.Join(dst, rel), info.Mode())
-					}
-					if err := os.Mkdir(filepath.Join(dst, rel), info.Mode()); err != nil {
-						exitf("os.Mkdir(%s) error: %s", filepath.Join(dst, rel), err)
-					}
-					return nil
-				}
-
-				wg.Add(1)
-				go func() {
-					defer func() { wg.Done() }()
-					copyFile(filepath.Join(dst, rel), path)
-				}()
-				return nil
-			})
-			if err != nil && err != filepath.SkipDir {
-				exitf("walking %s: %s", src, err)
-			}
-		}(file)
-	}
-
-	wg.Wait()
-}
-
 func info(servers []*Server) {
 	var wg sync.WaitGroup
 	for _, serv := range servers {
@@ -456,15 +381,11 @@ func parseCfg(configPath string) (cfg Config) {
 	r, err := os.OpenFile(configPath, os.O_RDONLY, 0644)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("Config %s doesn't exist or is unspecified.\nTo specify with flag -c (e.g. -c harp.json)\n", configPath)
-			os.Exit(1)
-			return
+			exitf("Config %s doesn't exist or is unspecified.\nTo specify with flag -c (e.g. -c harp.json)", configPath)
 		}
 		exitf("failed to read config: %s", err)
 	}
-	r = JsonConfigReader.New(r)
-	err = json.NewDecoder(r).Decode(&cfg)
-	if err != nil {
+	if err := json.NewDecoder(JsonConfigReader.New(r)).Decode(&cfg); err != nil {
 		exitf("failed to parse config: %s", err)
 	}
 
@@ -650,31 +571,17 @@ examples:
 }
 
 func retrieveServers() []*Server {
-	var serverSets []string
-	for _, set := range strings.Split(option.serverSet, ",") {
-		set = strings.TrimSpace(set)
-		if set == "" {
-			continue
-		}
-		serverSets = append(serverSets, set)
-	}
-
-	var servers []string
-	for _, server := range strings.Split(option.server, ",") {
-		server = strings.TrimSpace(server)
-		if server == "" {
-			continue
-		}
-		servers = append(servers, server)
-	}
+	serverSets := option.serverSets
+	servers := option.servers
 
 	if option.all {
+		serverSets = []string{}
 		for set, _ := range cfg.Servers {
 			serverSets = append(serverSets, set)
 		}
 	}
 
-	if option.server == "" && option.serverSet == "" {
+	if len(servers) == 0 && len(serverSets) == 0 {
 		println("please specify servers or server sets to deploy (-s or -server).")
 		println("specify -all flag to execute the action on all servers.")
 		os.Exit(1)
@@ -705,7 +612,13 @@ serversLoop:
 				}
 			}
 		}
-		println("unknown server:", server)
+
+		// one-shot servers
+		if s := newOneShotServer(server); s != nil {
+			targetServers = append(targetServers, newOneShotServer(server))
+		} else {
+			exitf("wrong url format (eg: name@host:port): %s", server)
+		}
 		os.Exit(1)
 	}
 
@@ -735,7 +648,7 @@ func initHarp() {
 		"name":       "%s",
 		"importpath": "%s",
 		"envs": {},
-		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/", "*.swp"],
+		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/", "*.swp", "*.go"],
 		"files":      [
 			"%s"
 		]

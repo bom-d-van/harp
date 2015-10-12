@@ -29,8 +29,8 @@ func TestRetrieveServers(t *testing.T) {
 			},
 		},
 	}
-	serverSet = "prod"
-	server = "app@192.168.59.103:49156"
+	option.serverSets = []string{"prod"}
+	option.servers = []string{"app@192.168.59.103:49156"}
 	servers := retrieveServers()
 	if len(servers) != 3 {
 		t.Error("failed to retrieve 3 correct servers")
