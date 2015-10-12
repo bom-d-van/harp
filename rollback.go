@@ -2,18 +2,20 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"sort"
 	"strings"
 )
 
 func lsRollbackVersions(servers []*Server, verbose bool) {
 	for _, s := range servers {
-		fmt.Println("# ====================================")
-		fmt.Println("#", s.String())
+		log.Println("# ====================================")
+		log.Println("#", s.String())
 		s.initPathes()
 		releases := s.retrieveAllReleases()
 		for _, r := range releases {
-			fmt.Println("Release:", r)
+			log.Println(r)
 			if !verbose {
 				continue
 			}
@@ -21,30 +23,35 @@ func lsRollbackVersions(servers []*Server, verbose bool) {
 			session := s.getSession()
 			output, err := session.CombinedOutput(fmt.Sprintf("cat %s/harp/%s/releases/%s/harp-build.info", s.Home, cfg.App.Name, r))
 			if err != nil {
-				fmt.Printf("echo $HOME on %s error: %s\n", s, err)
+				log.Printf("echo $HOME on %s error: %s\n%s\n", s, err, output)
+				os.Exit(1)
 			}
 			session.Close()
 			info := strings.Replace(string(output), "\n", "\n\t", -1)
-			fmt.Println("\t" + info[:len(info)-2])
+			log.Println("\t" + info[:len(info)-2])
 		}
 	}
 }
 
 func rollback(servers []*Server, version string) {
 	for _, s := range servers {
-		fmt.Printf("%s rollback start\n", s.String())
+		log.Printf("%s rollback start\n", s.String())
 		s.initPathes()
 		session := s.getSession()
-		if debugf {
-			fmt.Println(s.retrieveRollbackScript())
+		if option.debug {
+			log.Println(s.retrieveRollbackScript())
 		}
+		// TODO: should return error when release does not exist
 		output, err := session.CombinedOutput(fmt.Sprintf("%s/harp/%s/rollback.sh %s", s.Home, cfg.App.Name, version))
 		if err != nil {
-			fmt.Printf("rollback on %s error: %s\n", s, err)
+			log.Printf("rollback on %s error: %s\n%s\n", s, err, output)
+			os.Exit(1)
 		}
 		session.Close()
-		fmt.Printf(string(output))
-		fmt.Printf("%s rollback done\n", s.String())
+		if strings.TrimSpace(string(output)) != "" {
+			log.Print(string(output))
+		}
+		log.Printf("%s rollback done\n", s.String())
 	}
 }
 
@@ -59,8 +66,8 @@ func (s *Server) trimOldReleases() {
 	for _, release := range releases[:len(releases)-cfg.RollbackCount] {
 		session := s.getSession()
 		script := fmt.Sprintf("rm -rf %s/harp/%s/releases/%s", s.Home, cfg.App.Name, release)
-		if debugf {
-			fmt.Printf("%s: %s\n", s, script)
+		if option.debug {
+			log.Printf("%s: %s\n", s, script)
 		}
 		output, err := session.CombinedOutput(script)
 		if err != nil {

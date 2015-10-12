@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -17,13 +20,13 @@ import (
 )
 
 type Server struct {
-	ID string // TODO
+	ID string
 
 	Envs   map[string]string
 	Home   string
 	GoPath string
 	LogDir string
-	PIDDir string
+	// PIDDir string
 
 	User string
 	Host string
@@ -32,29 +35,67 @@ type Server struct {
 	Set string // aka, Type
 
 	client *ssh.Client
+
+	Config *Config
+}
+
+var urlRegexp = regexp.MustCompile(`(?P<user>[^@]+)@(?P<host>[^:]+):(?P<port>.*)`)
+var testMode bool
+
+func newOneShotServer(url string) *Server {
+	log.Println(url)
+	if !urlRegexp.MatchString(url) {
+		return nil
+	}
+	matches := urlRegexp.FindStringSubmatch(url)
+	var s Server
+	s.User = matches[1]
+	s.Host = matches[2]
+	s.Port = ":" + matches[3]
+
+	if !testMode {
+		s.init("")
+	}
+
+	return &s
+}
+
+func (s *Server) init(set string) {
+	s.Config = &cfg
+	s.Set = set
+	if s.User == "" {
+		fmt.Printf("%s contains server with empty user name\n", set)
+		os.Exit(1)
+	} else if s.Host == "" {
+		fmt.Printf("%s contains server with empty host\n", set)
+		os.Exit(1)
+	}
+	if s.Port == "" {
+		s.Port = ":22"
+	}
+
+	s.initSetUp()
+	s.initPathes()
 }
 
 // copy files into tmp/harp/
 // exclude files
 func (s *Server) upload(info string) {
-	s.initSetUp()
-	s.initPathes()
-
 	ssh := fmt.Sprintf(`ssh -l %s -p %s`, s.User, strings.TrimLeft(s.Port, ":"))
 
 	appName := cfg.App.Name
 	dst := fmt.Sprintf("%s@%s:%s/harp/%s/", s.User, s.Host, s.Home, appName)
-	// if debugf {
+	// if option.debug {
 	// 	fmt.Println("rsync", "-az", "--delete", "-e", ssh, filepath.Join(tmpDir, appName), filepath.Join(tmpDir, "files"), dst)
 	// }
 	args := []string{"-az", "--delete", "-e", ssh}
-	if debugf {
+	if option.debug {
 		args = append(args, "-P")
 	}
-	if !noBuild {
+	if !option.noBuild {
 		args = append(args, filepath.Join(tmpDir, appName))
 	}
-	if !noFiles {
+	if !option.noFiles {
 		args = append(args, filepath.Join(tmpDir, "files"))
 	}
 	cmd := exec.Command("rsync", append(args, dst)...)
@@ -74,7 +115,7 @@ func (s *Server) upload(info string) {
 }
 
 func (s *Server) deploy() {
-	// if debugf {
+	// if option.debug {
 	// 	log.Println("deplying", s.String())
 	// }
 
@@ -88,7 +129,7 @@ func (s *Server) deploy() {
 	defer session.Close()
 
 	script := s.retrieveDeployScript()
-	if debugf {
+	if option.debug {
 		fmt.Printf("%s", script)
 	}
 	if output, err := session.CombinedOutput(script); err != nil {
@@ -112,8 +153,6 @@ func (s *Server) scriptData() interface{} {
 }
 
 func (s *Server) syncFilesScript() (script string) {
-	// gopath := s.getGoPath()
-	s.initPathes()
 	script += fmt.Sprintf("mkdir -p %s/bin %s/src %s/src/%s\n", s.GoPath, s.GoPath, s.GoPath, cfg.App.ImportPath)
 
 	// TODO: handle callback error
@@ -155,20 +194,49 @@ func (s *Server) syncFilesScript() (script string) {
 	return
 }
 
-func (s *Server) restartScript() (script string) {
-	// gopath := s.getGoPath()
-	s.initPathes()
-	app := cfg.App
-	log := fmt.Sprintf("%s/harp/%s/app.log", s.Home, app.Name)
-	pid := fmt.Sprintf("%s/harp/%s/app.pid", s.Home, app.Name)
-	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
-	target=$(cat %[1]s);
+func (s *Server) GetLogDir() string {
+	dir := s.LogDir
+	if dir == "" {
+		dir = fmt.Sprintf("%s/harp/%s/log", s.Home, cfg.App.Name)
+	}
+	return dir
+}
+
+func (s *Server) LogPath() string {
+	return filepath.Join(s.GetLogDir(), "app.log")
+}
+
+func (s *Server) PIDPath() string {
+	return fmt.Sprintf("%s/harp/%s/app.pid", s.Home, cfg.App.Name)
+}
+
+var restartScriptTmpl = template.Must(template.New("").Parse(`if [[ -f {{.PIDPath}} ]]; then
+	target=$(cat {{.PIDPath}});
 	if ps -p $target > /dev/null; then
-		kill -%[4]s $target; > /dev/null 2>&1;
+		kill -{{.Config.App.KillSig}} $target; > /dev/null 2>&1;
 	fi
 fi
-touch %[2]s
-`, pid, log, app.Name, app.KillSig)
+mkdir -p {{.GetLogDir}}
+touch {{.LogPath}}
+`))
+
+func (s *Server) restartScript() (script string) {
+	app := cfg.App
+	log := s.LogPath()
+	pid := s.PIDPath()
+	// 	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
+	// 	target=$(cat %[1]s);
+	// 	if ps -p $target > /dev/null; then
+	// 		kill -%[4]s $target; > /dev/null 2>&1;
+	// 	fi
+	// fi
+	// touch %[2]s
+	// `, pid, log, app.Name, app.KillSig)
+	var buf bytes.Buffer
+	if err := restartScriptTmpl.Execute(&buf, s); err != nil {
+		exitf("failed to execute restartScriptTmpl: %s", err)
+	}
+	script += buf.String()
 
 	envs := fmt.Sprintf(`%s=%q`, "GOPATH", s.GoPath)
 	for k, v := range app.Envs {
@@ -185,19 +253,21 @@ touch %[2]s
 	return
 }
 
+var releaseTsOnce sync.Once
+var releaseTs string
+
 func (s *Server) saveReleaseScript() (script string) {
 	if cfg.NoRollback {
 		return
 	}
 
-	s.initPathes()
-	app := cfg.App
-	now := time.Now().Format("06-01-02-15:04:05")
+	releaseTsOnce.Do(func() { releaseTs = time.Now().Format("06-01-02-15:04:05") })
+
 	script += fmt.Sprintf(`cd %s/harp/%s
 if [[ -f harp-build.info ]]; then
 	mkdir -p releases/%s
 	cp -rf %s harp-build.info files kill.sh restart.sh rollback.sh releases/%s
-fi`, s.Home, app.Name, now, cfg.App.Name, now)
+fi`, s.Home, cfg.App.Name, releaseTs, cfg.App.Name, releaseTs)
 	return
 }
 
@@ -230,7 +300,6 @@ const defaultDeployScript = `set -e
 `
 
 func (s *Server) saveScript(name, script string) {
-	s.initPathes()
 	session := s.getSession()
 	defer session.Close()
 	cmd := fmt.Sprintf(`cat <<EOF > %s/harp/%s/%s.sh
@@ -246,7 +315,6 @@ chmod +x %s/harp/%s/%s.sh
 }
 
 func (s *Server) retrieveRollbackScript() string {
-	s.initPathes()
 	data := struct {
 		Config
 		*Server
@@ -262,7 +330,7 @@ func (s *Server) retrieveRollbackScript() string {
 	if err := rollbackScriptTmpl.Execute(&buf, data); err != nil {
 		exitf(err.Error())
 	}
-	if debugf {
+	if option.debug {
 		fmt.Println(buf.String())
 	}
 	return buf.String()
@@ -393,8 +461,6 @@ func (s *Server) initSetUp() {
 
 // TODO: add test
 func (s *Server) diffFiles() string {
-	s.initPathes()
-
 	session := s.getSession()
 	fileRoot := fmt.Sprintf("%s/harp/%s/files/", s.Home, cfg.App.Name)
 	cmd := fmt.Sprintf(`if [[ -d "%s/harp/%s/" ]]; then

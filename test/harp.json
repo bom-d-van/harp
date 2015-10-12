@@ -1,6 +1,7 @@
 {
 	"GOOS": "linux",
 	"GOARCH": "amd64",
+	// "log_path": "harp/{{.App.Name}}/log",
 	"App": {
 		"Name":       "app",
 		"ImportPath": "github.com/bom-d-van/harp/test",
@@ -20,12 +21,12 @@
 		"prod": [{
 			"ID":   "pluto",
 			"User": "app",
-			"Host": "192.168.59.103",
+			"Host": "192.168.99.100",
 			"Port": ":49153"
 		}, {
 			"ID":   "neptune",
 			"User": "app",
-			"Host": "192.168.59.103",
+			"Host": "192.168.99.100",
 			"Port": ":49154"
 		}]
 	}
