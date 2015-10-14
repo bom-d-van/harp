@@ -63,7 +63,7 @@ func migrate(servers []*Server, migrations []Migration) {
 		}(server)
 	}
 	wg.Wait()
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
 }
 
 func bundleMigration(migrations []Migration) {
