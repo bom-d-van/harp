@@ -270,8 +270,11 @@ func main() {
 	case "migrate", "run":
 		// TODO: could specify to run on all servers
 		if len(migrations) == 0 {
-			log.Println("run command is deprecated. please use flag: -run.")
-			log.Println("e.g. harp -s prod -run file.go -run file2.go")
+			migrations = retrieveMigrations(args[1:])
+		}
+		if len(migrations) == 0 {
+			log.Println("please specify migration file or package import path")
+			log.Println("e.g. harp -s prod run file.go my/import/path/to/pkg")
 			os.Exit(1)
 		}
 		migrate(servers, migrations)

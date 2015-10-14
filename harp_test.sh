@@ -53,16 +53,16 @@ echo tmp/harp -c test/harp.json -server app@$dmip:49153 deploy
 tmp/harp -c test/harp.json -server app@$dmip:49153 deploy
 
 echo ====================
-echo tmp/harp -c test/harp.json -server app@$dmip:49153 -run "AppEnv=prod test/migration.go -arg1 val1 -arg2 val2" -run test/migration2.go
-tmp/harp -c test/harp.json -server app@$dmip:49153 -run "AppEnv=prod test/migration.go -arg1 val1 -arg2 val2" -run test/migration2.go
+echo tmp/harp -c test/harp.json -server app@$dmip:49153 run "AppEnv=prod test/migration.go -arg1 val1 -arg2 val2" test/migration2.go
+tmp/harp -c test/harp.json -server app@$dmip:49153 run "AppEnv=prod test/migration.go -arg1 val1 -arg2 val2" test/migration2.go
 
 echo ====================
-echo tmp/harp -c test/harp.json -s prod -run github.com/bom-d-van/harp/test/migration3
-tmp/harp -c test/harp.json -s prod -run github.com/bom-d-van/harp/test/migration3
+echo tmp/harp -c test/harp.json -s prod run github.com/bom-d-van/harp/test/migration3
+tmp/harp -c test/harp.json -s prod run github.com/bom-d-van/harp/test/migration3
 
 echo ====================
-echo tmp/harp -c test/harp2.json -s prod -run github.com/bom-d-van/harp/test/migration3
-tmp/harp -c test/harp2.json -s prod -run github.com/bom-d-van/harp/test/migration3
+echo tmp/harp -c test/harp2.json -s prod run github.com/bom-d-van/harp/test/migration3
+tmp/harp -c test/harp2.json -s prod run github.com/bom-d-van/harp/test/migration3
 
 echo ====================
 echo tmp/harp -c test/harp.json -s prod rollback ls
