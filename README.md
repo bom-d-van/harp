@@ -255,7 +255,7 @@ harp supports you to override its default deploy script. Add configuration like 
 	"Name":         "app",
 	"DeployScript": "path-to-your-script-template",
 	"RestartScript": "path-to-your-script-template",
-	"MigrationScript": "path-to-your-script-template",
+	"MigrationScript": "path-to-your-script-template"
 },
 ```
 
