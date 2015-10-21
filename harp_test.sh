@@ -63,6 +63,8 @@ tmp/harp -c test/harp.json -s prod run github.com/bom-d-van/harp/test/migration3
 echo ====================
 echo tmp/harp -c test/harp2.json -s prod run github.com/bom-d-van/harp/test/migration3
 tmp/harp -c test/harp2.json -s prod run github.com/bom-d-van/harp/test/migration3
+ssh app@$dmip -p 49153 -- tail migration.log
+ssh app@$dmip -p 49153 -- tail /home/app/src/github.com/bom-d-van/harp/test/migration.log
 
 echo ====================
 echo tmp/harp -c test/harp.json -s prod rollback ls

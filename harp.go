@@ -105,8 +105,9 @@ type App struct {
 	// Default: 1MB
 	FileWarningSize int64
 
-	DeployScript  string
-	RestartScript string
+	DeployScript    string
+	RestartScript   string
+	MigrationScript string
 }
 
 type Tasks []string

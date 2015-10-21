@@ -181,6 +181,19 @@ func (s *Server) runMigration(migrations []Migration) {
 		exitf("failed to generate migration script: %s", err)
 	}
 
+	if s.Config.App.MigrationScript != "" {
+		var customScript bytes.Buffer
+		err := template.Must(template.New("migration.sh").ParseFiles(s.Config.App.MigrationScript)).Execute(&customScript, map[string]interface{}{
+			"Server":        s,
+			"App":           s.Config.App,
+			"DefaultScript": script.String(),
+		})
+		if err != nil {
+			exitf("failed to generate custom script (%s): %s", s.Config.App.MigrationScript, err)
+		}
+		script = customScript
+	}
+
 	if option.debug || option.hand {
 		log.Printf("===============\n%s\n%s", s, trimEmptyLines(script.String()))
 		if option.hand {

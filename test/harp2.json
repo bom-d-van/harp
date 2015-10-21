@@ -6,7 +6,8 @@
 		"ImportPath": "github.com/bom-d-van/harp/test",
 		"DeployScript": "test/deploy.sh",
 		"RestartScript": "test/restart.sh",
-		"BuildCmd": "docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/local/go/bin/go build -o /home/app/src/github.com/bom-d-van/harp/%s %s'",
+		"MigrationScript": "test/migration.sh",
+		"BuildCmd": "docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'cd /home/app/src/github.com/bom-d-van/harp; GOPATH=/home/app /usr/local/go/bin/go build -o /home/app/src/github.com/bom-d-van/harp/%s %s'",
 		"Files":      [
 			"github.com/bom-d-van/harp/test/files",
 			"github.com/bom-d-van/harp/test/file"

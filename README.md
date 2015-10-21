@@ -226,7 +226,7 @@ Add `BuildCmd` option in `App` as bellow:
 ```
 "App": {
 	"Name":       "app",
-	"BuildCmd":   "docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/local/go/bin/go build -o /home/app/src/github.com/bom-d-van/harp/%s %s'"
+	"BuildCmd":   "docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'cd /home/app/src/github.com/bom-d-van/harp; GOPATH=/home/app /usr/local/go/bin/go build -o /home/app/src/github.com/bom-d-van/harp/%s %s'"
 }
 ```
 
@@ -253,9 +253,13 @@ harp supports you to override its default deploy script. Add configuration like 
 ```
 "App": {
 	"Name":         "app",
-	"DeployScript": "path-to-your-script-template"
+	"DeployScript": "path-to-your-script-template",
+	"RestartScript": "path-to-your-script-template",
+	"MigrationScript": "path-to-your-script-template",
 },
 ```
+
+#### Deploy and Restart Script
 
 The script could be a `text/template.Template`, into which harp pass a data as bellow:
 
@@ -270,33 +274,43 @@ map[string]interface{}{
 type App struct {
 	Name       string
 	ImportPath string
-	Files      []string
+
+	NoRelMatch       bool
+	DefaultExcludeds []string
+	Files            []File
 
 	Args []string
 	Envs map[string]string
 
-	BuildCmd string
+	BuildCmd  string
+	BuildArgs string
 
 	KillSig string
 
-	// TODO: could override default deploy script for out-of-band deploy
+	// Default: 1MB
+	FileWarningSize int64
+
 	DeployScript  string
 	RestartScript string
 }
 
 type Server struct {
+	ID string
+
 	Envs   map[string]string
+	Home   string
 	GoPath string
 	LogDir string
-	PIDDir string
 
 	User string
 	Host string
 	Port string
 
-	Set string
+	Set string // aka, Type
 
 	client *ssh.Client
+
+	Config *Config
 }
 ```
 
@@ -317,6 +331,18 @@ set -e
 ```
 
 You can inspect your script by evoking command: `harp -s prod inspect deploy` or `harp -s prod inspect restart`.
+
+#### Migration Script
+
+Migration script template data is:
+
+```
+map[string]interface{}{
+	"Server":        harp.Server,
+	"App":           harp.App,
+	"DefaultScript": string,
+}
+```
 
 ### Server Informations
 
