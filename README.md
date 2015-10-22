@@ -344,6 +344,18 @@ map[string]interface{}{
 }
 ```
 
+The default migration template contains only the default script. So for now you can only rewrite migration in this fashion:
+
+```
+set -e
+
+# custom scripts
+
+{{.DefaultScript}}
+
+# custom scripts
+```
+
 ### Server Informations
 
 You can use `harp info` to retrieve build and deploy information about the current running server. For example:
