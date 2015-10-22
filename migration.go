@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -183,12 +184,15 @@ func (s *Server) runMigration(migrations []Migration) {
 
 	if s.Config.App.MigrationScript != "" {
 		var customScript bytes.Buffer
-		err := template.Must(template.New("migration.sh").ParseFiles(s.Config.App.MigrationScript)).Execute(&customScript, map[string]interface{}{
+		file, err := ioutil.ReadFile(s.Config.App.MigrationScript)
+		if err != nil {
+			exitf("failed to read file (%s): %s", s.Config.App.MigrationScript, err)
+		}
+		if err := template.Must(template.New("migration.sh").Parse(string(file))).Execute(&customScript, map[string]interface{}{
 			"Server":        s,
 			"App":           s.Config.App,
 			"DefaultScript": script.String(),
-		})
-		if err != nil {
+		}); err != nil {
 			exitf("failed to generate custom script (%s): %s", s.Config.App.MigrationScript, err)
 		}
 		script = customScript
