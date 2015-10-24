@@ -198,8 +198,10 @@ func (s *Server) runMigration(migrations []Migration) {
 		script = customScript
 	}
 
+	scriptStr := script.String()
+	scriptStr = trimEmptyLines(scriptStr)
 	if option.debug || option.hand {
-		log.Printf("===============\n%s\n%s", s, trimEmptyLines(script.String()))
+		log.Printf("=============== (%s)\n%s===============\n", s, scriptStr)
 		if option.hand {
 			return
 		}
@@ -207,8 +209,8 @@ func (s *Server) runMigration(migrations []Migration) {
 
 	logSession(session)
 
-	if err := session.Run(script.String()); err != nil {
-		exitf("failed at runing script: %s\n%s", err, script)
+	if err := session.Run(scriptStr); err != nil {
+		exitf("failed at runing script: %s\n===============\n%s===============", err, scriptStr)
 	}
 }
 
