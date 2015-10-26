@@ -400,7 +400,7 @@ func parseCfg(configPath string) (cfg Config) {
 
 	for k, set := range cfg.Servers {
 		for _, s := range set {
-			s.init(k)
+			s.Set = k
 		}
 	}
 
@@ -625,6 +625,10 @@ serversLoop:
 			exitf("wrong url format (eg: name@host:port): %s", server)
 		}
 		os.Exit(1)
+	}
+
+	for _, s := range targetServers {
+		s.init()
 	}
 
 	return targetServers

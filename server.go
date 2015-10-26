@@ -54,20 +54,19 @@ func newOneShotServer(url string) *Server {
 	s.Port = ":" + matches[3]
 
 	if !testMode {
-		s.init("")
+		s.init()
 	}
 
 	return &s
 }
 
-func (s *Server) init(set string) {
+func (s *Server) init() {
 	s.Config = &cfg
-	s.Set = set
 	if s.User == "" {
-		fmt.Printf("%s contains server with empty user name\n", set)
+		fmt.Printf("%s contains server with empty user name\n", s.Set)
 		os.Exit(1)
 	} else if s.Host == "" {
-		fmt.Printf("%s contains server with empty host\n", set)
+		fmt.Printf("%s contains server with empty host\n", s.Set)
 		os.Exit(1)
 	}
 	if s.Port == "" {
