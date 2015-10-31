@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"text/template"
@@ -447,7 +448,15 @@ func (s *Server) initClient() {
 
 	s.client, err = ssh.Dial("tcp", s.Host+s.Port, config)
 	if err != nil {
-		exitf("failed to dial %s: %s", s.Host+s.Port, err)
+		fmt.Fprintf(os.Stderr, "failed to dial %s: %s\n\n", s.Host+s.Port, err)
+		fmt.Println("Harp is using ssh-agent and passwordless-login to access your servers.")
+		fmt.Println("Make sure you have added your private key in ssh-agent (ssh-add -l).")
+		fmt.Println("More information could be found here: https://github.com/bom-d-van/harp#server-access-using-ssh")
+
+		if option.debug {
+			debug.PrintStack()
+		}
+		os.Exit(1)
 	}
 }
 

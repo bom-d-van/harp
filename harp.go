@@ -534,7 +534,7 @@ func exitf(format string, args ...interface{}) {
 	if !strings.HasSuffix(format, "\n") {
 		format += "\n"
 	}
-	fmt.Printf(format, args...)
+	fmt.Fprintf(os.Stderr, format, args...)
 	debug.PrintStack()
 	os.Exit(1)
 }

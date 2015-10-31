@@ -18,6 +18,19 @@ Server: Harps works on Linus servers.
 
 Third-party requirements: tar, rsync on both server and local.
 
+### Server access using SSH
+
+Harp is using passwordless login with ssh-agent to access your servers. You can find some help from here:
+
+http://www.linuxproblem.org/art_9.html
+
+You can add your key in ssh-agent by:
+
+```sh
+ssh-add ~/.ssh/id_rsa # or other path to your private key
+ssh-add -l
+```
+
 ## Usage
 
 ```sh
