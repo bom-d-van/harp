@@ -78,9 +78,9 @@ harp -h
 
 ## Common Trouble Shootings
 
-### To many open files
+### Too many open files
 
-To fix this problem, you need to increase your ulimit:
+To fix this problem, you need to increase ulimit:
 
 ```
 ulimit -n 10240 // or any number that is large enough
@@ -105,7 +105,7 @@ example:
 		},
 
 		// these are included in all file Excludeds
-		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/"],
+		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/", "*.go"],
 		"Files":      [
 			// files here could be a string or an object
 			"github.com/bom-d-van/harp/test/files",
