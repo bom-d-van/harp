@@ -95,7 +95,7 @@ example:
 
 ```js
 {
-	// comments is supported in harp.json
+	// comments are supported in harp.json
 	"GOOS": "linux",   // for go build
 	"GOARCH": "amd64", // for go build
 	"App": {
