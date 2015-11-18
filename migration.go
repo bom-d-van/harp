@@ -165,7 +165,7 @@ func (s *Server) runMigration(migrations []Migration) {
 
 	session := s.getSession()
 	var script bytes.Buffer
-	err := migrationScript.Execute(&script, struct {
+	data := struct {
 		Migrations []Migration
 		Path       string
 		GoPath     string
@@ -177,7 +177,11 @@ func (s *Server) runMigration(migrations []Migration) {
 		GoPath:     s.GoPath,
 		App:        cfg.App.Name,
 		Home:       s.Home,
-	})
+	}
+	if option.transient {
+		data.Path = s.Home
+	}
+	err := migrationScript.Execute(&script, data)
 	if err != nil {
 		exitf("failed to generate migration script: %s", err)
 	}

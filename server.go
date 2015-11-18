@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -40,11 +39,10 @@ type Server struct {
 	Config *Config
 }
 
-var urlRegexp = regexp.MustCompile(`(?P<user>[^@]+)@(?P<host>[^:]+):(?P<port>.*)`)
+var urlRegexp = regexp.MustCompile(`(?P<user>[^@]+)@(?P<host>[^:]+)(?P<port>:.*)?`)
 var testMode bool
 
 func newOneShotServer(url string) *Server {
-	log.Println(url)
 	if !urlRegexp.MatchString(url) {
 		return nil
 	}
@@ -52,7 +50,10 @@ func newOneShotServer(url string) *Server {
 	var s Server
 	s.User = matches[1]
 	s.Host = matches[2]
-	s.Port = ":" + matches[3]
+	s.Port = matches[3]
+	if s.Port == "" {
+		s.Port = ":22"
+	}
 
 	if !testMode {
 		s.init()

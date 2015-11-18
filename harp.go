@@ -163,6 +163,8 @@ var (
 		hand  bool
 
 		cli bool
+
+		transient bool
 	}{}
 
 	migrations []Migration
@@ -178,7 +180,6 @@ func main() {
 	flag.StringVar(&option.configPath, "c", "harp.json", "config file path")
 
 	flag.BoolVar(&option.debug, "debug", false, "print debug info")
-	// flag.BoolVar(&verbose, "v", false, "verbose")
 
 	flag.BoolVar(&option.noBuild, "nb", false, "no build")
 	flag.BoolVar(&option.noBuild, "no-build", false, "no build")
@@ -208,8 +209,6 @@ func main() {
 
 	flag.StringVar(&option.buildArgs, "build-args", "", "build args speicified for building your programs. (default -a -v)")
 
-	// flag.StringVar(&option.script, "scripts", "", "scripts to build and run on server")
-
 	flag.Var(&option.serverSets, "s", "specify server sets to deploy, multiple sets are split by comma")
 	flag.Var(&option.serverSets, "server-set", "specify server sets to deploy, multiple sets are split by comma")
 
@@ -219,15 +218,20 @@ func main() {
 
 	flag.IntVar(&option.syncFileLimit, "sync-queue-size", 5, "set file syncing queue size.")
 
-	// flag.StringVar(&option.migration, "m", "", "specify migrations to run on server, multiple migrations are split by comma")
-	// flag.StringVar(&option.server, "server", "", "specify servers to deploy, multiple servers are split by comma")
-
 	flag.StringVar(&option.deploy, "deploy", "", "deploy app to servers/sets")
 
 	flag.Var(&option.tasks, "run", "run go scripts/packages on remote server.")
 	flag.BoolVar(&option.hand, "hand", false, "pirnt out shell scripts could be executed by hand on remote servers")
 
+	flag.StringVar(&cfg.GOOS, "goos", "linux", "GOOS")
+	flag.StringVar(&cfg.GOARCH, "goarch", "amd64", "GOARCH")
+	flag.BoolVar(&option.transient, "t", false, "run migration in transient app")
+
 	flag.Parse()
+
+	if option.debug {
+		log.SetFlags(log.Lshortfile)
+	}
 
 	if option.version {
 		printVersion()
@@ -256,7 +260,11 @@ func main() {
 		return
 	}
 
-	cfg = parseCfg(option.configPath)
+	if option.transient {
+		cfg.App.Name = "harp"
+	} else {
+		cfg = parseCfg(option.configPath)
+	}
 
 	var servers []*Server
 	if action != "cross-compile" && action != "xc" {
@@ -487,7 +495,7 @@ func cmd(name string, args ...string) string {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		exitf("faied to run %s %s: %s(%s)\n", name, args, err, string(output))
+		exitf("faied to run: %s %s: %s\n%s\n", name, strings.Join(args, " "), err, output)
 	}
 
 	return string(output)
@@ -624,7 +632,6 @@ serversLoop:
 		} else {
 			exitf("wrong url format (eg: name@host:port): %s", server)
 		}
-		os.Exit(1)
 	}
 
 	for _, s := range targetServers {
