@@ -92,11 +92,17 @@ example:
 
 ```js
 {
+	// comments is supported in harp.json
 	"GOOS": "linux",   // for go build
 	"GOARCH": "amd64", // for go build
 	"App": {
 		"Name":       "app",
 		"ImportPath": "github.com/bom-d-van/harp/test",
+
+		// will be applied to all servers
+		"Env": {
+			"var1": "value"
+		},
 
 		// these are included in all file Excludeds
 		"DefaultExcludeds": [".git/", "tmp/", ".DS_Store", "node_modules/"],
@@ -123,6 +129,10 @@ example:
 		"prod": [{
 			"ID":  "pluto", // ID field could be used to specify server with `-server` flag
 			"User": "app",
+			// server specific env vars
+			"Env": {
+				"var1": "value"
+			},
 			"Host": "192.168.59.103",
 			"Port": ":49155"
 		}, {
@@ -389,6 +399,16 @@ Build At: 2015-07-06 21:28:55.359181899 +0800 CST
 Note: Composer means deployer.
 
 You can specify your composer name by saving your name in a file named `.harp-composer`.
+
+### Scripts saved on servers
+
+Harp saves a few scripts on yoru servers after deploy. It could be found in `$HOME/harp/$APP_Name/`.
+
+These scripts could be used as Monitor integration:
+
+* `kill.sh`: kill the application;
+* `restart.sh`: restart the application;
+* `rollback.sh`: rollback the application: need to specify version (directory names in `releases` folder).
 
 ### Initialize go cross compilation
 
