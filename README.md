@@ -74,6 +74,9 @@ harp -s prod -no-files deploy
 
 # More flags and usages
 harp -h
+
+# Run arbitrary Go program wihtout harp.json
+harp -server app@test.com:8022 -t run app.go # with default -goos=linux -goarch=amd64
 ```
 
 ## Common Trouble Shootings
