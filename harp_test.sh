@@ -76,6 +76,10 @@ for version in `tmp/harp -c test/harp.json -s prod rollback ls | tail -2`; do
 	# ssh app@$dmip -p 49153 -- cat /home/app/src/github.com/bom-d-van/harp/test/files/file2
 done
 
+echo ====================
+echo tmp/harp -server app@$dmip:49153 -t run github.com/bom-d-van/harp/test/migration3
+tmp/harp -server app@$dmip:49153 -t run github.com/bom-d-van/harp/test/migration3
+
 git checkout -- test/test_version.go test/files/file1 test/files/file2
 
 # remove big file
