@@ -337,6 +337,9 @@ type Server struct {
 	client *ssh.Client
 
 	Config *Config
+
+	// Proxy is for ssh bastion host/ProxyCommand/middleman
+	Proxy *Server
 }
 ```
 
