@@ -37,6 +37,8 @@ type Server struct {
 	client *ssh.Client
 
 	Config *Config
+
+	Proxy *Server
 }
 
 var urlRegexp = regexp.MustCompile(`(?P<user>[^@]+)@(?P<host>[^:]+)(?P<port>:.*)?`)
@@ -82,7 +84,12 @@ func (s *Server) init() {
 // copy files into tmp/harp/
 // exclude files
 func (s *Server) upload(info string) {
+	// rsync -av -e 'ssh -o "ProxyCommand ssh -p port bastion-dev@proxy exec nc %h %p 2>/dev/null"' test.txt app@target:~/
+	// rsync -avrP -e 'ssh -o ProxyCommand="ssh -W %h:%p bastion-dev@proxy -p port"' test.txt app@target:~/
 	ssh := fmt.Sprintf(`ssh -l %s -p %s`, s.User, strings.TrimLeft(s.Port, ":"))
+	if s.Proxy != nil {
+		ssh = fmt.Sprintf(`ssh -o ProxyCommand="ssh -W %%h:%%p %s@%s -p %s"`, s.Proxy.User, s.Proxy.Host, strings.TrimLeft(s.Proxy.Port, ":"))
+	}
 
 	appName := cfg.App.Name
 	dst := fmt.Sprintf("%s@%s:%s/harp/%s/", s.User, s.Host, s.Home, appName)
@@ -98,6 +105,9 @@ func (s *Server) upload(info string) {
 	}
 	if !option.noFiles {
 		args = append(args, filepath.Join(tmpDir, "files"))
+	}
+	if option.debug {
+		fmt.Println("upload cmd:", strings.Join(append([]string{"rsync"}, append(args, dst)...), " "))
 	}
 	cmd := exec.Command("rsync", append(args, dst)...)
 	cmd.Stdout = os.Stdout
@@ -432,7 +442,13 @@ func (s Server) String() string {
 	return fmt.Sprintf("%s@%s%s", s.User, s.Host, s.Port)
 }
 
+// TODO: add tests
 func (s *Server) initClient() {
+	user := s.User
+	if s.Proxy != nil {
+		user = s.Proxy.User
+	}
+
 	sock, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		exitf("failed to dial unix SSH_AUTH_SOCK: %s", err)
@@ -443,13 +459,21 @@ func (s *Server) initClient() {
 	}
 	auths := []ssh.AuthMethod{ssh.PublicKeys(signers...)}
 	config := &ssh.ClientConfig{
-		User: s.User,
+		User: user,
 		Auth: auths,
 	}
 
-	s.client, err = ssh.Dial("tcp", s.Host+s.Port, config)
+	dst := s.Host + s.Port
+	if s.Proxy != nil {
+		dst = s.Proxy.Host + s.Proxy.Port
+	}
+	s.client, err = ssh.Dial("tcp", dst, config)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to dial %s: %s\n\n", s.Host+s.Port, err)
+		serv := s
+		if s.Proxy != nil {
+			serv = s.Proxy
+		}
+		fmt.Fprintf(os.Stderr, "failed to dial %s: %s\n\n", serv, err)
 		fmt.Println("Harp is using ssh-agent and passwordless-login to access your servers.")
 		fmt.Println("Make sure you have added your private key in ssh-agent (ssh-add -l).")
 		fmt.Println("More information could be found here: https://github.com/bom-d-van/harp#server-access-using-ssh")
@@ -459,6 +483,24 @@ func (s *Server) initClient() {
 		}
 		os.Exit(1)
 	}
+
+	if s.Proxy == nil {
+		return
+	}
+
+	bastionConn, err := s.client.Dial("tcp", s.Host+s.Port)
+	if err != nil {
+		exitf("failed to dial %s from bastion host %s: %s", s, s.Proxy, err)
+	}
+
+	conn, newChan, reqs, err := ssh.NewClientConn(bastionConn, s.Host+s.Port, &ssh.ClientConfig{
+		User: s.User,
+		Auth: auths,
+	})
+	if err != nil {
+		exitf("Failed to handshake server %s from server %s: %s", s, s.Proxy, err)
+	}
+	s.client = ssh.NewClient(conn, newChan, reqs)
 }
 
 func (s *Server) initSetUp() {
