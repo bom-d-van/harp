@@ -82,6 +82,11 @@ tmp/harp -server app@$dmip:49153 -t run github.com/bom-d-van/harp/test/migration
 
 git checkout -- test/test_version.go test/files/file1 test/files/file2
 
+echo ====================
+echo "tmp/harp -server app@$dmip:49153 console <<<ls"
+tmp/harp -c test/harp.json -server app@$dmip:49153 console <<<ls
+tmp/harp -c test/harp.json -s prod console <<<ls
+
 # remove big file
 rm test/files/big-file
 rm test/files/test.swp
