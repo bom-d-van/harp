@@ -108,6 +108,9 @@ type App struct {
 	DeployScript    string
 	RestartScript   string
 	MigrationScript string
+
+	// TODO
+	// Hooks struct{}
 }
 
 type Tasks []string
@@ -127,6 +130,7 @@ func (t *FlagStrings) Set(s string) error {
 }
 
 var (
+	// option is a global control center, keeping flags in one place.
 	option = struct {
 		configPath string
 
@@ -160,11 +164,18 @@ var (
 		deploy string
 
 		tasks Tasks
-		hand  bool
+		hand  bool // hand flag indicates migration are executed but only deployed on servers
 
-		cli bool
+		// cli bool
 
+		// transient flag allow running go program without the presence of harp.json
 		transient bool
+
+		hook struct {
+			before, after string
+		}
+
+		docker bool
 	}{}
 
 	migrations []Migration
@@ -309,6 +320,8 @@ func main() {
 		}
 	case "cross-compile", "xc":
 		initXC()
+	case "console", "shell", "sh":
+		startConsole(servers)
 	default:
 		fmt.Println("unknown command:", args[0])
 		os.Exit(1)

@@ -77,6 +77,11 @@ harp -h
 
 # Run arbitrary Go program wihtout harp.json
 harp -server app@test.com:8022 -t run app.go # with default -goos=linux -goarch=amd64
+
+# Run shell commands or execute scripts with harp console (alias: sh, shell)
+harp -s prod console
+harp -s prod console < my-shell-script
+harp -s prod console <<<(ls)
 ```
 
 ## Common Trouble Shootings
@@ -152,6 +157,8 @@ example:
 	}
 }
 ```
+
+## Usages
 
 ### How to specify server or server sets:
 
@@ -425,3 +432,18 @@ harp xc
 ```
 
 Note: before using `harp xc`, you need to enable cross compilation by installing go from source, details could be found here: https://golang.org/doc/install/source
+
+### Console (sh, shell)
+
+Run shell commands or execute scripts with harp console (alias: sh, shell)
+
+```
+# start a repl to execute shell commands
+harp -s prod console
+
+# run a script
+harp -s prod console < my-shell-script
+
+# another example
+harp -s prod console <<<(ls)
+```

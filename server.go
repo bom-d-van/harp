@@ -22,7 +22,9 @@ import (
 type Server struct {
 	ID string
 
-	Envs   map[string]string
+	Envs map[string]string
+	// Args   []string // TODO: support
+
 	Home   string
 	GoPath string
 	LogDir string
@@ -31,6 +33,9 @@ type Server struct {
 	User string
 	Host string
 	Port string
+
+	// TODO
+	Password string
 
 	Set string // aka, Type
 
@@ -258,6 +263,7 @@ func (s *Server) restartScript() (script string) {
 	}
 	args := strings.Join(app.Args, " ")
 	script += fmt.Sprintf("cd %s/src/%s\n", s.GoPath, app.ImportPath)
+	// env=val nohup $GOPATH/bin/$app arg1 >> $log 2&1 &
 	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, s.GoPath, app.Name, args, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
 	script += "cd " + s.Home
@@ -437,6 +443,25 @@ func (s *Server) getSession() *ssh.Session {
 	return session
 }
 
+func (s *Server) exec(cmd string) string {
+	if s.client == nil {
+		s.initClient()
+	}
+
+	session, err := s.client.NewSession()
+	if err != nil {
+		// fmt.Printf("%s: %s\n", s, err)
+		return err.Error()
+	}
+
+	output, err := session.CombinedOutput(cmd)
+	if err != nil {
+		output = append([]byte(err.Error()+"\n"), output...)
+	}
+	session.Close()
+	return string(output)
+}
+
 // name@host:port
 func (s Server) String() string {
 	return fmt.Sprintf("%s@%s%s", s.User, s.Host, s.Port)
@@ -544,4 +569,13 @@ func (s *Server) diffFiles() string {
 	}
 
 	return diff
+}
+
+func (s *Server) prompt() string {
+	whoami := strings.TrimSpace(s.exec("whoami"))
+	hostname := strings.TrimSpace(s.exec("hostname"))
+	if whoami == "" || hostname == "" {
+		return fmt.Sprintf("%s:%s$", s, s.Home)
+	}
+	return fmt.Sprintf("%s@%s:%s$", whoami, hostname, s.Home)
 }
