@@ -31,7 +31,7 @@ ssh-add ~/.ssh/id_rsa # or other path to your private key
 ssh-add -l
 ```
 
-## Usage
+## Examples
 
 ```sh
 # Init harp.json
@@ -93,6 +93,10 @@ To fix this problem, you need to increase ulimit:
 ```
 ulimit -n 10240 // or any number that is large enough
 ```
+
+### The .harp directory
+
+Harp creates a temporary directory called .harp in the current path where it is invoked. It will be removed after harp exits. Under rare circumstances, you can use `harp clean` to remove the directory manually. Also, it's better include `.harp` in `.gitignore` or similar counterpart of your VCS tool.
 
 ## Configuration
 
