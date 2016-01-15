@@ -579,3 +579,7 @@ func (s *Server) prompt() string {
 	}
 	return fmt.Sprintf("%s@%s:%s$", whoami, hostname, s.Home)
 }
+
+func (s *Server) AppRoot() string {
+	return fmt.Sprintf("%s/src/%s/", s.GoPath, cfg.App.ImportPath)
+}

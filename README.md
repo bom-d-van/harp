@@ -352,6 +352,8 @@ type Server struct {
 	// Proxy is for ssh bastion host/ProxyCommand/middleman
 	Proxy *Server
 }
+
+func (Server) AppRoot() string
 ```
 
 A default deploy script is:
