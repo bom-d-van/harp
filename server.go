@@ -197,7 +197,11 @@ func (s *Server) syncFilesScript() (script string) {
 		if dstf.Delete {
 			delete = "--delete"
 		}
-		script += fmt.Sprintf("rsync -az %s \"%s\" \"%s\"\n", delete, src, dst)
+		var excludes []string
+		for _, e := range dstf.Excludeds {
+			excludes = append(excludes, fmt.Sprintf("--exclude '%s'", e))
+		}
+		script += fmt.Sprintf("rsync -az %s %s \"%s\" \"%s\"\n", delete, strings.Join(excludes, " "), src, dst)
 	}
 
 	script += fmt.Sprintf("cp %s/harp/%s/harp-build.info %s/src/%s/\n", s.Home, cfg.App.Name, s.GoPath, cfg.App.ImportPath)
