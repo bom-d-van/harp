@@ -112,7 +112,7 @@ example:
 		"ImportPath": "github.com/bom-d-van/harp/test",
 
 		// will be applied to all servers
-		"Env": {
+		"Envs": {
 			"var1": "value"
 		},
 
@@ -142,8 +142,8 @@ example:
 			"ID":  "pluto", // ID field could be used to specify server with `-server` flag
 			"User": "app",
 			// server specific env vars
-			"Env": {
-				"var1": "value"
+			"Envs": {
+				"var2": "value2"
 			},
 			"Host": "192.168.59.103",
 			"Port": ":49155"
