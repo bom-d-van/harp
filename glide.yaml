@@ -1,0 +1,9 @@
+package: github.com/bom-d-van/harp
+import:
+- package: github.com/DisposaBoy/JsonConfigReader
+- package: github.com/cheggaaa/pb
+- package: github.com/chzyer/readline
+- package: golang.org/x/crypto
+  subpackages:
+  - /ssh
+  - ssh/agent

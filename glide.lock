@@ -1,0 +1,32 @@
+hash: ebb14dfab26abfec7683a28cc4bf9d4f17d88d9e5f72d32ddea15df9a8b70630
+updated: 2016-02-19T18:30:03.278366301+08:00
+imports:
+- name: github.com/cheggaaa/pb
+  version: 4788033326290f47bb40c29942fa8e919e2ee597
+- name: github.com/chzyer/readline
+  version: 5aaa89df05e26e3f095ccd5a70f43b8600bcbe4a
+- name: github.com/davecgh/go-spew
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  subpackages:
+  - spew
+- name: github.com/DisposaBoy/JsonConfigReader
+  version: 33a99fdf1d5ee1f79b5077e9c06f955ad356d5f4
+- name: github.com/nbutton23/zxcvbn-go
+  version: 5fb7f48ad1914518a3781e7bb7f2f3eb267e7ac9
+  repo: https://github.com/nbutton23/zxcvbn-go
+- name: github.com/pmezard/go-difflib
+  version: e8554b8641db39598be7f6342874b958f12ae1d4
+  subpackages:
+  - difflib
+- name: github.com/stretchr/objx
+  version: cbeaeb16a013161a98496fad62933b1d21786672
+- name: github.com/stretchr/testify
+  version: 38b5d653e3cad9252e69070a3fe23377ab380557
+  subpackages:
+  - assert
+- name: golang.org/x/crypto
+  version: 1f22c0103821b9390939b6776727195525381532
+  subpackages:
+  - /ssh
+  - ssh/agent
+devImports: []
