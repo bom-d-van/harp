@@ -328,11 +328,11 @@ func main() {
 	}
 
 	if option.toTailLog {
-		if !option.keepCache {
-			if err := os.RemoveAll(tmpDir); err != nil {
-				exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
-			}
-		}
+		// if !option.keepCache {
+		// 	if err := os.RemoveAll(tmpDir); err != nil {
+		// 		exitf("os.RemoveAll(%s) error: %s", tmpDir, err)
+		// 	}
+		// }
 		tailLog(servers, option.tailBeginLineNum)
 	}
 }
