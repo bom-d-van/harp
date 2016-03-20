@@ -86,6 +86,7 @@ func (s *Server) init() {
 	s.initPathes()
 }
 
+// TODO: pipelining output instead of be silently totally
 // copy files into tmp/harp/
 // exclude files
 func (s *Server) upload(info string) {
