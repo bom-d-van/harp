@@ -561,9 +561,9 @@ func (s *Server) diffFiles() string {
 	}
 
 	var diff string
-	for _, lfile := range localFiles {
-		if _, ok := serverFiles[lfile.relDst()]; !ok {
-			diff += fmt.Sprintf("+ %s %s\n", lfile.size, lfile.src)
+	for _, f := range localFiles {
+		if _, ok := serverFiles[f.relDst()]; !ok {
+			diff += fmt.Sprintf("+ %s %s\n", f, f.src)
 		}
 	}
 

@@ -26,6 +26,8 @@ import (
 // 	Clean up: remove data from servers (harp/[app], $GOPATH/src/[import-path]; remove $GOPATH/ with --all)
 // 	tmux support for long migrations
 
+// TODO: Add start, restart, kill log markers!
+
 // PRINCIPLES
 // KISS
 // BC (Being Convinent: all things in one place)
@@ -278,7 +280,7 @@ func main() {
 	}
 
 	var servers []*Server
-	if action != "cross-compile" && action != "xc" {
+	if action != "cross-compile" && action != "xc" && !(action == "inspect" && args[1] == "files") {
 		servers = retrieveServers()
 	}
 
@@ -556,7 +558,9 @@ func exitf(format string, args ...interface{}) {
 		format += "\n"
 	}
 	fmt.Fprintf(os.Stderr, format, args...)
-	debug.PrintStack()
+	if option.debug {
+		debug.PrintStack()
+	}
 	os.Exit(1)
 }
 
@@ -576,6 +580,12 @@ actions:
     rollback
         ls       List all the current releases.
         $version Rollback to $version.
+    inspect	Inspect script content and others.
+    	deploy
+    	restart
+    	kill
+    	rollback
+    	files
 
 options:`)
 	flag.PrintDefaults()
@@ -695,6 +705,11 @@ func initHarp() {
 }
 
 func inspectScript(servers []*Server, name string) {
+	if name == "files" {
+		inspectFiles()
+		return
+	}
+
 	for _, s := range servers {
 		fmt.Println("# ====================================")
 		fmt.Println("#", s.String())
