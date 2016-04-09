@@ -793,5 +793,5 @@ func cleanCaches() {
 }
 
 func printVersion() {
-	fmt.Printf("0.4.%d\n", version)
+	fmt.Printf("0.5.%d\n", version)
 }
