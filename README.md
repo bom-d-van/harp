@@ -246,6 +246,8 @@ You can change how many releases you want to keep by `RollbackCount` or disable 
 }
 ```
 
+Note: rollback depends on `harp.json`, if `Files` or other configs are changed, rollback might not work.
+
 ### Build Args Specification
 
 Harp supports go build tool arguments specification.

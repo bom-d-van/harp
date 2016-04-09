@@ -26,8 +26,6 @@ import (
 // 	Clean up: remove data from servers (harp/[app], $GOPATH/src/[import-path]; remove $GOPATH/ with --all)
 // 	tmux support for long migrations
 
-// TODO: Add start, restart, kill log markers!
-
 // PRINCIPLES
 // KISS
 // BC (Being Convinent: all things in one place)
@@ -768,6 +766,7 @@ if [[ -f {{.Home}}/harp/{{.App.Name}}/app.pid ]]; then
 	if ps -p $target > /dev/null; then
 		kill -KILL $target; > /dev/null 2>&1;
 	fi
+	echo "[harp] $(date) server killed" >> {{.LogPath}}
 fi`))
 
 func initXC() {
