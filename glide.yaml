@@ -5,5 +5,35 @@ import:
 - package: github.com/chzyer/readline
 - package: golang.org/x/crypto
   subpackages:
-  - /ssh
+  - ssh
   - ssh/agent
+- package: AUTHORS
+- package: CONTRIBUTING.md
+- package: CONTRIBUTORS
+- package: LICENSE
+- package: PATENTS
+- package: README
+- package: bcrypt
+- package: blowfish
+- package: bn256
+- package: cast5
+- package: codereview.cfg
+- package: curve25519
+- package: hkdf
+- package: md4
+- package: nacl
+- package: ocsp
+- package: openpgp
+- package: otr
+- package: pbkdf2
+- package: pkcs12
+- package: poly1305
+- package: ripemd160
+- package: salsa20
+- package: scrypt
+- package: sha3
+- package: ssh
+- package: tea
+- package: twofish
+- package: xtea
+- package: xts
