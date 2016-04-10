@@ -23,8 +23,9 @@ import (
 )
 
 // TODOs
-// 	Clean up: remove data from servers (harp/[app], $GOPATH/src/[import-path]; remove $GOPATH/ with --all)
-// 	tmux support for long migrations
+// 	***	tail command
+// 	**	git status in Info?
+// 	*	tmux support for long migrations?
 
 // PRINCIPLES
 // KISS
