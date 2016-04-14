@@ -23,6 +23,8 @@ import (
 )
 
 // TODOs
+// 	***	version control (harp version; go version too?)
+// 	***	checkers in PATH
 // 	***	tail command
 // 	**	git status in Info?
 // 	*	tmux support for long migrations?
