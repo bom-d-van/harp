@@ -466,3 +466,5 @@ harp -s prod console < my-shell-script
 # another example
 harp -s prod console <<<(ls)
 ```
+
+Note: harp console doesn't support blocking calls like `tail -f file.log`.
