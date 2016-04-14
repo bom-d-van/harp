@@ -23,8 +23,11 @@ import (
 )
 
 // TODOs
-// 	Clean up: remove data from servers (harp/[app], $GOPATH/src/[import-path]; remove $GOPATH/ with --all)
-// 	tmux support for long migrations
+// 	***	version control (harp version; go version too?)
+// 	***	checkers in PATH
+// 	***	tail command
+// 	**	git status in Info?
+// 	*	tmux support for long migrations?
 
 // PRINCIPLES
 // KISS
@@ -278,7 +281,7 @@ func main() {
 	}
 
 	var servers []*Server
-	if action != "cross-compile" && action != "xc" {
+	if action != "cross-compile" && action != "xc" && !(action == "inspect" && args[1] == "files") {
 		servers = retrieveServers()
 	}
 
@@ -556,7 +559,9 @@ func exitf(format string, args ...interface{}) {
 		format += "\n"
 	}
 	fmt.Fprintf(os.Stderr, format, args...)
-	debug.PrintStack()
+	if option.debug {
+		debug.PrintStack()
+	}
 	os.Exit(1)
 }
 
@@ -576,6 +581,12 @@ actions:
     rollback
         ls       List all the current releases.
         $version Rollback to $version.
+    inspect	Inspect script content and others.
+    	deploy
+    	restart
+    	kill
+    	rollback
+    	files
 
 options:`)
 	flag.PrintDefaults()
@@ -695,6 +706,11 @@ func initHarp() {
 }
 
 func inspectScript(servers []*Server, name string) {
+	if name == "files" {
+		inspectFiles()
+		return
+	}
+
 	for _, s := range servers {
 		fmt.Println("# ====================================")
 		fmt.Println("#", s.String())
@@ -753,6 +769,7 @@ if [[ -f {{.Home}}/harp/{{.App.Name}}/app.pid ]]; then
 	if ps -p $target > /dev/null; then
 		kill -KILL $target; > /dev/null 2>&1;
 	fi
+	echo "[harp] $(date) server killed" >> {{.LogPath}}
 fi`))
 
 func initXC() {
@@ -779,5 +796,5 @@ func cleanCaches() {
 }
 
 func printVersion() {
-	fmt.Printf("0.4.%d\n", version)
+	fmt.Printf("0.5.%d\n", version)
 }

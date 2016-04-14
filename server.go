@@ -269,6 +269,7 @@ func (s *Server) restartScript() (script string) {
 	args := strings.Join(app.Args, " ")
 	script += fmt.Sprintf("cd %s/src/%s\n", s.GoPath, app.ImportPath)
 	// env=val nohup $GOPATH/bin/$app arg1 >> $log 2&1 &
+	script += fmt.Sprintf(`echo "[harp] $(date) server deployed/restarted" >> %s`+"\n", log)
 	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, s.GoPath, app.Name, args, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
 	script += "cd " + s.Home
@@ -561,9 +562,9 @@ func (s *Server) diffFiles() string {
 	}
 
 	var diff string
-	for _, lfile := range localFiles {
-		if _, ok := serverFiles[lfile.relDst()]; !ok {
-			diff += fmt.Sprintf("+ %s %s\n", lfile.size, lfile.src)
+	for _, f := range localFiles {
+		if _, ok := serverFiles[f.relDst()]; !ok {
+			diff += fmt.Sprintf("+ %s %s\n", f, f.src)
 		}
 	}
 

@@ -162,6 +162,17 @@ example:
 }
 ```
 
+### Vendor Support
+
+`harp` doesn't have built-in vendor support. To upload vendor files, you could still use its import path releative to your $GOPATH. e.g.:
+
+```
+	"Files": [
+		"github.com/org/repo/vendor/my/pkg",
+		...
+	]
+```
+
 ## Usages
 
 ### How to specify server or server sets:
@@ -234,6 +245,8 @@ You can change how many releases you want to keep by `RollbackCount` or disable 
 	...
 }
 ```
+
+Note: rollback depends on `harp.json`, if `Files` or other configs are changed, rollback might not work.
 
 ### Build Args Specification
 
