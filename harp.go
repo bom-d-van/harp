@@ -306,9 +306,10 @@ func main() {
 	case "log":
 		option.toTailLog = true
 	case "restart":
-		option.noBuild = true
-		option.noUpload = true
-		deploy(servers)
+		// option.noBuild = true
+		// option.noUpload = true
+		// deploy(servers)
+		restart(servers)
 	case "inspect":
 		inspectScript(servers, args[1])
 	case "rollback":
@@ -316,7 +317,7 @@ func main() {
 			fmt.Println("please specify rollback command or version")
 			os.Exit(1)
 		}
-		if args[1] == "ls" || args[1] == "list" {
+		if args[1] == "l" || args[1] == "ls" || args[1] == "list" {
 			lsRollbackVersions(servers, args[1] == "list")
 		} else {
 			rollback(servers, strings.TrimSpace(args[1]))
@@ -454,7 +455,7 @@ func getBuildLog() string {
 	vcs, checksum := retrieveChecksum()
 	info += vcs + " Checksum: " + checksum
 
-	info += "Composer: " + retrieveAuthor()
+	info += "Composer: " + retrieveAuthor() + "\n"
 
 	info += "Build At: " + time.Now().String()
 
@@ -480,23 +481,21 @@ func retrieveChecksum() (vcs, checksum string) {
 	return
 }
 
-func retrieveAuthor() (author string) {
+func retrieveAuthor() string {
 	name, err := ioutil.ReadFile(".harp-composer")
 	if err == nil && len(name) > 0 {
-		return string(name)
+		return strings.TrimSpace(string(name))
 	}
 
-	author = tryCmd("git", "config", "user.name")
-	if author != "" {
-		return
+	if author := tryCmd("git", "config", "user.name"); author != "" {
+		return strings.TrimSpace(author)
 	}
 
-	author = tryCmd("whoami")
-	if author != "" {
-		return
+	if author := tryCmd("whoami"); author != "" {
+		return strings.TrimSpace(author)
 	}
 
-	return "Unknown"
+	return "anonymous"
 }
 
 func isUsingGit() bool {
@@ -718,9 +717,9 @@ func inspectScript(servers []*Server, name string) {
 		case "deploy":
 			fmt.Println(s.retrieveDeployScript())
 		case "restart":
-			fmt.Println(s.retrieveRestartScript())
+			fmt.Println(s.retrieveRestartScript(retrieveAuthor()))
 		case "kill":
-			fmt.Println(s.retrieveKillScript())
+			fmt.Println(s.retrieveKillScript(retrieveAuthor()))
 		case "rollback":
 			fmt.Println(s.retrieveRollbackScript())
 		default:
@@ -738,7 +737,7 @@ func kill(servers []*Server) {
 
 			session := s.getSession()
 			defer session.Close()
-			output, err := session.CombinedOutput(s.retrieveKillScript())
+			output, err := session.CombinedOutput(s.retrieveKillScript(retrieveAuthor()))
 			if err != nil {
 				exitf("failed to exec %s: %s %s", option.script, string(output), err)
 			}
@@ -748,13 +747,28 @@ func kill(servers []*Server) {
 	wg.Wait()
 }
 
-func (s *Server) retrieveKillScript() string {
+var killScriptTmpl = template.Must(template.New("").Parse(`set -e
+if [[ -f {{.Home}}/harp/{{.App.Name}}/app.pid ]]; then
+	target=$(cat {{.Home}}/harp/{{.App.Name}}/app.pid);
+	if ps -p $target > /dev/null; then
+		kill -KILL $target; > /dev/null 2>&1;
+	fi
+	{{.GetHarpComposer}}
+	echo "[harp] $(date) $harp_composer killed server" | tee -a {{.LogPath}} {{.HistoryLogPath}} >/dev/null
+fi`))
+
+func (s *Server) retrieveKillScript(who string) string {
 	s.initPathes()
 	var buf bytes.Buffer
 	if err := killScriptTmpl.Execute(&buf, struct {
 		Config
 		*Server
-	}{Config: cfg, Server: s}); err != nil {
+		GetHarpComposer string
+	}{
+		Config:          cfg,
+		Server:          s,
+		GetHarpComposer: s.GetHarpComposer(who),
+	}); err != nil {
 		exitf(err.Error())
 	}
 	if option.debug {
@@ -763,14 +777,24 @@ func (s *Server) retrieveKillScript() string {
 	return buf.String()
 }
 
-var killScriptTmpl = template.Must(template.New("").Parse(`set -e
-if [[ -f {{.Home}}/harp/{{.App.Name}}/app.pid ]]; then
-	target=$(cat {{.Home}}/harp/{{.App.Name}}/app.pid);
-	if ps -p $target > /dev/null; then
-		kill -KILL $target; > /dev/null 2>&1;
-	fi
-	echo "[harp] $(date) server killed" >> {{.LogPath}}
-fi`))
+func restart(servers []*Server) {
+	var wg sync.WaitGroup
+	for _, server := range servers {
+		wg.Add(1)
+		go func(s *Server) {
+			defer func() { wg.Done() }()
+
+			session := s.getSession()
+			defer session.Close()
+			output, err := session.CombinedOutput(s.retrieveRestartScript(retrieveAuthor()))
+			if err != nil {
+				exitf("failed to exec %s: %s %s", option.script, string(output), err)
+			}
+			log.Printf("%s restarted\n", s)
+		}(server)
+	}
+	wg.Wait()
+}
 
 func initXC() {
 	goroot := strings.TrimSpace(cmd("go", "env", "GOROOT"))
@@ -795,6 +819,4 @@ func cleanCaches() {
 	}
 }
 
-func printVersion() {
-	fmt.Printf("0.5.%d\n", version)
-}
+func printVersion() { fmt.Printf("0.6.%d\n", version) }

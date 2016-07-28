@@ -466,3 +466,7 @@ harp -s prod console <<<(ls)
 ```
 
 Note: harp console doesn't support blocking calls like `tail -f file.log`.
+
+### Deployment history
+
+harp saves a one-line deployment/restart/kill/rollback log in `~/harp/$APP_Name/log/history.log`.

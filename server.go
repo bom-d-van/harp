@@ -86,7 +86,7 @@ func (s *Server) init() {
 	s.initPathes()
 }
 
-// TODO: pipelining output instead of be silently totally
+// TODO: pipelining output instead of being silent
 // copy files into tmp/harp/
 // exclude files
 func (s *Server) upload(info string) {
@@ -137,8 +137,8 @@ func (s *Server) deploy() {
 	// }
 
 	// TODO: save scripts(s) for kill app
-	s.saveScript("restart", s.retrieveRestartScript())
-	s.saveScript("kill", s.retrieveKillScript())
+	s.saveScript("restart", s.retrieveRestartScript(""))
+	s.saveScript("kill", s.retrieveKillScript(""))
 	s.saveScript("rollback", s.retrieveRollbackScript())
 
 	// var output []byte
@@ -159,12 +159,12 @@ func (s *Server) deploy() {
 	}
 }
 
-func (s *Server) scriptData() interface{} {
+func (s *Server) scriptData(typ, who string) interface{} {
 	return map[string]interface{}{
 		"App":           cfg.App,
 		"Server":        s,
 		"SyncFiles":     s.syncFilesScript(),
-		"RestartServer": s.restartScript(),
+		"RestartServer": s.restartScript(typ, who),
 		"SaveRelease":   s.saveReleaseScript(),
 	}
 }
@@ -223,13 +223,14 @@ func (s *Server) GetLogDir() string {
 	return dir
 }
 
-func (s *Server) LogPath() string {
-	return filepath.Join(s.GetLogDir(), "app.log")
-}
+// LogPath returns application log path.
+func (s *Server) LogPath() string { return filepath.Join(s.GetLogDir(), "app.log") }
 
-func (s *Server) PIDPath() string {
-	return fmt.Sprintf("%s/harp/%s/app.pid", s.Home, cfg.App.Name)
-}
+// HistoryLogPath returns deployment, kill, and restart history file path.
+func (s *Server) HistoryLogPath() string { return filepath.Join(s.GetLogDir(), "history.log") }
+
+// PIDPath returns PID file path.
+func (s *Server) PIDPath() string { return fmt.Sprintf("%s/harp/%s/app.pid", s.Home, cfg.App.Name) }
 
 var restartScriptTmpl = template.Must(template.New("").Parse(`if [[ -f {{.PIDPath}} ]]; then
 	target=$(cat {{.PIDPath}});
@@ -241,18 +242,11 @@ mkdir -p {{.GetLogDir}}
 touch {{.LogPath}}
 `))
 
-func (s *Server) restartScript() (script string) {
+func (s *Server) restartScript(typ, who string) (script string) {
 	app := cfg.App
 	log := s.LogPath()
 	pid := s.PIDPath()
-	// 	script += fmt.Sprintf(`if [[ -f %[1]s ]]; then
-	// 	target=$(cat %[1]s);
-	// 	if ps -p $target > /dev/null; then
-	// 		kill -%[4]s $target; > /dev/null 2>&1;
-	// 	fi
-	// fi
-	// touch %[2]s
-	// `, pid, log, app.Name, app.KillSig)
+
 	var buf bytes.Buffer
 	if err := restartScriptTmpl.Execute(&buf, s); err != nil {
 		exitf("failed to execute restartScriptTmpl: %s", err)
@@ -269,11 +263,29 @@ func (s *Server) restartScript() (script string) {
 	args := strings.Join(app.Args, " ")
 	script += fmt.Sprintf("cd %s/src/%s\n", s.GoPath, app.ImportPath)
 	// env=val nohup $GOPATH/bin/$app arg1 >> $log 2&1 &
-	script += fmt.Sprintf(`echo "[harp] $(date) server deployed/restarted" >> %s`+"\n", log)
+
+	script += s.GetHarpComposer(who)
+
+	script += fmt.Sprintf(
+		`echo "[harp] $(date) $harp_composer %s server" | tee -a %s %s >/dev/null`+"\n",
+		typ, log, s.HistoryLogPath(),
+	)
 	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, s.GoPath, app.Name, args, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
 	script += "cd " + s.Home
 	return
+}
+
+func (s *Server) GetHarpComposer(who string) string {
+	var script string
+	if who != "" {
+		script += fmt.Sprintf("harp_composer='%s'\n", who)
+	} else {
+		script += fmt.Sprintf("if [[ \"$harp_composer\" -eq \"\" ]]; then\n")
+		script += fmt.Sprintf("    harp_composer=`whoami`\n")
+		script += fmt.Sprintf("fi\n")
+	}
+	return script
 }
 
 var releaseTsOnce sync.Once
@@ -294,6 +306,11 @@ fi`, s.Home, cfg.App.Name, releaseTs, cfg.App.Name, releaseTs)
 	return
 }
 
+const defaultDeployScript = `set -e
+{{.SyncFiles}}
+{{.SaveRelease}}
+{{.RestartServer}}`
+
 func (s *Server) retrieveDeployScript() string {
 	script := defaultDeployScript
 	if cfg.App.DeployScript != "" {
@@ -309,18 +326,12 @@ func (s *Server) retrieveDeployScript() string {
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, s.scriptData()); err != nil {
+	if err := tmpl.Execute(&buf, s.scriptData("deployed", retrieveAuthor())); err != nil {
 		exitf(err.Error())
 	}
 
 	return buf.String()
 }
-
-const defaultDeployScript = `set -e
-{{.SyncFiles}}
-{{.SaveRelease}}
-{{.RestartServer}}
-`
 
 func (s *Server) saveScript(name, script string) {
 	session := s.getSession()
@@ -335,28 +346,6 @@ chmod +x %s/harp/%s/%s.sh
 	if err != nil {
 		exitf("failed to save kill script on %s: %s: %s", s, err, string(output))
 	}
-}
-
-func (s *Server) retrieveRollbackScript() string {
-	data := struct {
-		Config
-		*Server
-		SyncFiles     string
-		RestartScript string
-	}{
-		Config:        cfg,
-		Server:        s,
-		SyncFiles:     s.syncFilesScript(),
-		RestartScript: s.restartScript(),
-	}
-	var buf bytes.Buffer
-	if err := rollbackScriptTmpl.Execute(&buf, data); err != nil {
-		exitf(err.Error())
-	}
-	if option.debug {
-		fmt.Println(buf.String())
-	}
-	return buf.String()
 }
 
 var rollbackScriptTmpl = template.Must(template.New("").Parse(`set -e
@@ -376,7 +365,32 @@ done
 
 {{.RestartScript}}`))
 
-func (s Server) retrieveRestartScript() string {
+func (s *Server) retrieveRollbackScript() string {
+	data := struct {
+		Config
+		*Server
+		SyncFiles     string
+		RestartScript string
+	}{
+		Config:        cfg,
+		Server:        s,
+		SyncFiles:     s.syncFilesScript(),
+		RestartScript: s.restartScript("rollbacked", ""),
+	}
+	var buf bytes.Buffer
+	if err := rollbackScriptTmpl.Execute(&buf, data); err != nil {
+		exitf(err.Error())
+	}
+	if option.debug {
+		fmt.Println(buf.String())
+	}
+	return buf.String()
+}
+
+const defaultRestartScript = `set -e
+{{.RestartServer}}`
+
+func (s Server) retrieveRestartScript(who string) string {
 	script := defaultRestartScript
 	if cfg.App.RestartScript != "" {
 		cont, err := ioutil.ReadFile(cfg.App.RestartScript)
@@ -391,16 +405,12 @@ func (s Server) retrieveRestartScript() string {
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, s.scriptData()); err != nil {
+	if err := tmpl.Execute(&buf, s.scriptData("restarted", who)); err != nil {
 		exitf(err.Error())
 	}
 
 	return buf.String()
 }
-
-const defaultRestartScript = `set -e
-{{.RestartServer}}
-`
 
 func (s *Server) initPathes() {
 	if s.Home == "" {

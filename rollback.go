@@ -39,10 +39,17 @@ func rollback(servers []*Server, version string) {
 		s.initPathes()
 		session := s.getSession()
 		if option.debug {
-			log.Println(s.retrieveRollbackScript())
+			// log.Println(s.retrieveRollbackScript())
+			cmd := fmt.Sprintf("cat %s/harp/%s/rollback.sh", s.Home, cfg.App.Name)
+			output, err := session.CombinedOutput(cmd)
+			if err != nil {
+				log.Printf("failed to run %s\n", cmd)
+				os.Exit(1)
+			}
+			fmt.Println(string(output))
 		}
 		// TODO: should return error when release does not exist
-		output, err := session.CombinedOutput(fmt.Sprintf("%s/harp/%s/rollback.sh %s", s.Home, cfg.App.Name, version))
+		output, err := session.CombinedOutput(fmt.Sprintf("harp_composer=%s %s/harp/%s/rollback.sh %s", retrieveAuthor(), s.Home, cfg.App.Name, version))
 		if err != nil {
 			log.Printf("rollback on %s error: %s\n%s\n", s, err, output)
 			os.Exit(1)
