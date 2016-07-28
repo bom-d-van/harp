@@ -120,13 +120,13 @@ func (s *Server) upload(info string) {
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
-		exitf("failed to sync binary %s: %s", appName, err)
+		s.exitf("failed to sync binary %s: %s", appName, err)
 	}
 
 	session := s.getSession()
 	output, err := session.CombinedOutput(fmt.Sprintf("cat <<EOF > %s/harp/%s/harp-build.info\n%s\nEOF", s.Home, appName, info))
 	if err != nil {
-		exitf("failed to save build info: %s: %s", err, string(output))
+		s.exitf("failed to save build info: %s: %s", err, string(output))
 	}
 	session.Close()
 }
@@ -150,7 +150,7 @@ func (s *Server) deploy() {
 		fmt.Printf("%s", script)
 	}
 	if output, err := session.CombinedOutput(script); err != nil {
-		exitf("failed to exec %s: %s %s", script, string(output), err)
+		s.exitf("failed to exec %s: %s %s", script, string(output), err)
 	}
 
 	// clean older releases
@@ -190,7 +190,7 @@ func (s *Server) syncFilesScript() (script string) {
 			}
 		}
 		if hasErr {
-			exitf("failed to find %s from %s", odst, GoPaths)
+			s.exitf("failed to find %s from %s", odst, GoPaths)
 		}
 
 		script += fmt.Sprintf("mkdir -p \"%s\"\n", filepath.Dir(dst))
@@ -249,7 +249,7 @@ func (s *Server) restartScript(typ, who string) (script string) {
 
 	var buf bytes.Buffer
 	if err := restartScriptTmpl.Execute(&buf, s); err != nil {
-		exitf("failed to execute restartScriptTmpl: %s", err)
+		s.exitf("failed to execute restartScriptTmpl: %s", err)
 	}
 	script += buf.String()
 
@@ -274,6 +274,10 @@ func (s *Server) restartScript(typ, who string) (script string) {
 	script += fmt.Sprintf("echo $! > %s\n", pid)
 	script += "cd " + s.Home
 	return
+}
+
+func (s *Server) exitf(format string, args ...interface{}) {
+	exitf("[%s] "+format, append([]interface{}{s}, args...)...)
 }
 
 func (s *Server) GetHarpComposer(who string) string {
@@ -316,18 +320,18 @@ func (s *Server) retrieveDeployScript() string {
 	if cfg.App.DeployScript != "" {
 		cont, err := ioutil.ReadFile(cfg.App.DeployScript)
 		if err != nil {
-			exitf(err.Error())
+			s.exitf(err.Error())
 		}
 		script = string(cont)
 	}
 	tmpl, err := template.New("").Parse(script)
 	if err != nil {
-		exitf(err.Error())
+		s.exitf(err.Error())
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, s.scriptData("deployed", retrieveAuthor())); err != nil {
-		exitf(err.Error())
+		s.exitf(err.Error())
 	}
 
 	return buf.String()
@@ -344,7 +348,7 @@ chmod +x %s/harp/%s/%s.sh
 	cmd = strings.Replace(cmd, "$", "\\$", -1)
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
-		exitf("failed to save kill script on %s: %s: %s", s, err, string(output))
+		s.exitf("failed to save kill script on %s: %s: %s", s, err, string(output))
 	}
 }
 
@@ -379,7 +383,7 @@ func (s *Server) retrieveRollbackScript() string {
 	}
 	var buf bytes.Buffer
 	if err := rollbackScriptTmpl.Execute(&buf, data); err != nil {
-		exitf(err.Error())
+		s.exitf(err.Error())
 	}
 	if option.debug {
 		fmt.Println(buf.String())
@@ -395,18 +399,18 @@ func (s Server) retrieveRestartScript(who string) string {
 	if cfg.App.RestartScript != "" {
 		cont, err := ioutil.ReadFile(cfg.App.RestartScript)
 		if err != nil {
-			exitf(err.Error())
+			s.exitf(err.Error())
 		}
 		script = string(cont)
 	}
 	tmpl, err := template.New("").Parse(script)
 	if err != nil {
-		exitf(err.Error())
+		s.exitf(err.Error())
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, s.scriptData("restarted", who)); err != nil {
-		exitf(err.Error())
+		s.exitf(err.Error())
 	}
 
 	return buf.String()
@@ -453,7 +457,7 @@ func (s *Server) getSession() *ssh.Session {
 
 	session, err := s.client.NewSession()
 	if err != nil {
-		exitf("failed to get session to server %s@%s:%s: %s", s.User, s.Host, s.Port, err)
+		s.exitf("failed to get session to server %s@%s:%s: %s", s.User, s.Host, s.Port, err)
 	}
 
 	return session
@@ -492,11 +496,11 @@ func (s *Server) initClient() {
 
 	sock, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
-		exitf("failed to dial unix SSH_AUTH_SOCK: %s", err)
+		s.exitf("failed to dial unix SSH_AUTH_SOCK: %s", err)
 	}
 	signers, err := agent.NewClient(sock).Signers()
 	if err != nil {
-		exitf("failed to retrieve signers: %s", err)
+		s.exitf("failed to retrieve signers: %s", err)
 	}
 	auths := []ssh.AuthMethod{ssh.PublicKeys(signers...)}
 	config := &ssh.ClientConfig{
@@ -531,7 +535,7 @@ func (s *Server) initClient() {
 
 	bastionConn, err := s.client.Dial("tcp", s.Host+s.Port)
 	if err != nil {
-		exitf("failed to dial %s from bastion host %s: %s", s, s.Proxy, err)
+		s.exitf("failed to dial %s from bastion host %s: %s", s, s.Proxy, err)
 	}
 
 	conn, newChan, reqs, err := ssh.NewClientConn(bastionConn, s.Host+s.Port, &ssh.ClientConfig{
@@ -539,7 +543,7 @@ func (s *Server) initClient() {
 		Auth: auths,
 	})
 	if err != nil {
-		exitf("Failed to handshake server %s from server %s: %s", s, s.Proxy, err)
+		s.exitf("Failed to handshake server %s from server %s: %s", s, s.Proxy, err)
 	}
 	s.client = ssh.NewClient(conn, newChan, reqs)
 }
@@ -560,7 +564,7 @@ func (s *Server) diffFiles() string {
 	fi`, s.Home, cfg.App.Name, fileRoot)
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
-		exitf("failed to retrieve files: %s: %s %s", cmd, err, output)
+		s.exitf("failed to retrieve files: %s: %s %s", cmd, err, output)
 	}
 	session.Close()
 	serverFiles := map[string]struct{}{}
