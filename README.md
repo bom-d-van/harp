@@ -1,8 +1,6 @@
 # harp
 
-A go application deploy tool (or an easy way to start a daemon or to run go programs on remote servers).
-
-Note: even though harp is designed to be a local tool. You can use it in your build server and include harp as part of your build script.
+Harp mades Go application deployment simpler. The strategy is binary deployment. It manages logs, restart, kill, rollback, and migrations of Go applications. Harp is made to run on local environment for small to middle-sized projects. Run harp on a dedicated build server is also viable.
 
 ## What harp does
 
@@ -191,7 +189,7 @@ harp -s dev deploy
 harp -server app@192.168.59.102:49155 deploy
 ```
 
-### Migration / Run a go package/file on remote server
+### Migration / Run a Go package/file on remote server
 
 You can specify server or server sets on which your migration need to be executed.
 
@@ -290,7 +288,7 @@ docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/loc
 docker run -t -v $GOPATH:/home/app golang  /bin/sh -c 'GOPATH=/home/app /usr/local/go/bin/go build -o \$GOPATH/src/github.com/bom-d-van/harp/.harp/migrations/migration3.go github.com/bom-d-van/harp/test/migration3'
 ```
 
-__NOTE:__ Build override doesn't support non-package migrations. i.e. every migration under build override has to be a legal go package.
+__NOTE:__ Build override doesn't support non-package migrations. i.e. every migration under build override has to be a legal Go package.
 
 Build override is useful doing cross compilation for cgo-involved projects, e.g. using Mac OS X building Linux binaries by docker or any other tools etc.
 
@@ -442,7 +440,7 @@ These scripts could be used as Monitor integration:
 * `restart.sh`: restart the application;
 * `rollback.sh`: rollback the application: need to specify version (directory names in `releases` folder).
 
-### Initialize go cross compilation
+### Initialize Go cross compilation (For Go <= 1.5)
 
 If you need to initialize cross compilation environment, harp has a simple commend to help you:
 
