@@ -267,10 +267,10 @@ func (s *Server) restartScript(typ, who, checksum string) (script string) {
 	script += s.GetHarpComposer(who)
 
 	if checksum != "" {
-		checksum = " (" + checksum + ")"
+		checksum = `, \"checksum\": \"` + checksum + `\"`
 	}
 	script += fmt.Sprintf(
-		`echo "[harp] $(date) $harp_composer %s server%s" | tee -a %s %s >/dev/null`+"\n",
+		`echo "[harp] {\"datetime\": \"$(date)\", \"user\": \"$harp_composer\", \"type\": \"%s\"%s}" | tee -a %s %s >/dev/null`+"\n",
 		typ, checksum, log, s.HistoryLogPath(),
 	)
 	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, s.GoPath, app.Name, args, log)
@@ -334,7 +334,7 @@ func (s *Server) retrieveDeployScript() string {
 
 	var buf bytes.Buffer
 	_, checksum := retrieveChecksum()
-	if err := tmpl.Execute(&buf, s.scriptData("deployed", retrieveAuthor(), checksum)); err != nil {
+	if err := tmpl.Execute(&buf, s.scriptData("deploy", retrieveAuthor(), checksum)); err != nil {
 		s.exitf(err.Error())
 	}
 
@@ -383,7 +383,7 @@ func (s *Server) retrieveRollbackScript() string {
 		Config:        cfg,
 		Server:        s,
 		SyncFiles:     s.syncFilesScript(),
-		RestartScript: s.restartScript("rollbacked", "", ""),
+		RestartScript: s.restartScript("rollback", "", ""),
 	}
 	var buf bytes.Buffer
 	if err := rollbackScriptTmpl.Execute(&buf, data); err != nil {
@@ -413,7 +413,7 @@ func (s Server) retrieveRestartScript(who string) string {
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, s.scriptData("restarted", who, "")); err != nil {
+	if err := tmpl.Execute(&buf, s.scriptData("restart", who, "")); err != nil {
 		s.exitf(err.Error())
 	}
 

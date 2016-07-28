@@ -807,7 +807,7 @@ if [[ -f {{.Home}}/harp/{{.App.Name}}/app.pid ]]; then
 		kill -KILL $target; > /dev/null 2>&1;
 	fi
 	{{.GetHarpComposer}}
-	echo "[harp] $(date) $harp_composer killed server" | tee -a {{.LogPath}} {{.HistoryLogPath}} >/dev/null
+	echo "[harp] {\"datetime\": \"$(date)\", \"user\": \"$harp_composer\", \"type\": \"kill\"}" | tee -a {{.LogPath}} {{.HistoryLogPath}} >/dev/null
 fi`))
 
 func (s *Server) retrieveKillScript(who string) string {
