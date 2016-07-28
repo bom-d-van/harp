@@ -12,8 +12,10 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -179,6 +181,8 @@ var (
 		}
 
 		docker bool
+
+		force bool
 	}{}
 
 	migrations []Migration
@@ -241,6 +245,8 @@ func main() {
 	flag.StringVar(&cfg.GOARCH, "goarch", "amd64", "GOARCH")
 	flag.BoolVar(&option.transient, "t", false, "run migration in transient app")
 
+	flag.BoolVar(&option.force, "f", false, "force harp to deploy. ingore version checking")
+
 	flag.Parse()
 
 	if option.debug {
@@ -301,7 +307,7 @@ func main() {
 			os.Exit(1)
 		}
 		migrate(servers, migrations)
-	case "info":
+	case "info", "status":
 		info(servers)
 	case "log":
 		option.toTailLog = true
@@ -369,6 +375,16 @@ func deploy(servers []*Server) {
 		wg.Add(1)
 		go func(server *Server) {
 			defer wg.Done()
+
+			// check harp version
+			if err := server.checkHarpVersion(); err != nil {
+				if option.force {
+					fmt.Fprintf(os.Stderr, err.Error()+"\n")
+				} else {
+					exitf(err.Error() + "\n")
+				}
+			}
+
 			if !option.noUpload {
 				diff := server.diffFiles()
 				if diff != "" {
@@ -388,6 +404,31 @@ func deploy(servers []*Server) {
 	wg.Wait()
 }
 
+func (s *Server) checkHarpVersion() error {
+	output, err := s.getBuildInfo()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[%s] getBuildInfo(): %s\n", s, err)
+		return nil
+	}
+	matches := regexp.MustCompile(harpVersionPrefix + "([0-9\\.]+)\n").FindStringSubmatch(output)
+	if len(matches) != 2 {
+		fmt.Fprintf(os.Stderr, "[%s] failed to retrieve harp version\n", s)
+		return nil
+	}
+	old := strings.Split(matches[1], ".")
+	cur := strings.Split(getVersion(), ".")
+	if cmpver(old[0], cur[0]) > 0 || cmpver(old[1], cur[1]) > 0 || cmpver(old[2], cur[2]) > 0 {
+		return fmt.Errorf("server %s is deployed by harp version %s; your harp version is %s, please upgrade harp or skip harp version checking by flag -f", s, matches[1], getVersion())
+	}
+	return nil
+}
+
+func cmpver(v1, v2 string) int {
+	i1, _ := strconv.Atoi(v1)
+	i2, _ := strconv.Atoi(v2)
+	return i1 - i2
+}
+
 func info(servers []*Server) {
 	var wg sync.WaitGroup
 	for _, serv := range servers {
@@ -395,15 +436,23 @@ func info(servers []*Server) {
 		go func(serv *Server) {
 			defer wg.Done()
 			serv.initPathes()
-			session := serv.getSession()
-			output, err := session.CombinedOutput(fmt.Sprintf("cat %s/src/%s/harp-build.info", serv.GoPath, cfg.App.ImportPath))
+			output, err := serv.getBuildInfo()
 			if err != nil {
-				exitf("failed to cat %s.info on %s: %s(%s)", cfg.App.Name, serv, err, string(output))
+				exitf("failed to cat %s.info on %s: %s(%s)", cfg.App.Name, serv, err, output)
 			}
 			fmt.Printf("=====\n%s\n%s", serv.String(), output)
 		}(serv)
 	}
 	wg.Wait()
+}
+
+func (s *Server) getBuildInfo() (string, error) {
+	session := s.getSession()
+	output, err := session.CombinedOutput(fmt.Sprintf(
+		"cat %s/src/%s/harp-build.info",
+		s.GoPath, cfg.App.ImportPath,
+	))
+	return string(output), err
 }
 
 func parseCfg(configPath string) (cfg Config) {
@@ -442,6 +491,8 @@ func parseCfg(configPath string) (cfg Config) {
 	return
 }
 
+const harpVersionPrefix = "Harp Version: "
+
 func getBuildLog() string {
 	var info string
 	info += "Go Version: " + cmd("go", "version")
@@ -451,6 +502,8 @@ func getBuildLog() string {
 	if cfg.GOARCH != "" {
 		info += "GOARCH: " + cfg.GOARCH + "\n"
 	}
+
+	info += harpVersionPrefix + getVersion() + "\n"
 
 	vcs, checksum := retrieveChecksum()
 	info += vcs + " Checksum: " + checksum
@@ -573,12 +626,12 @@ actions:
     deploy   Deploy your application (e.g. harp -s prod deploy).
     run      Run migrations on server (e.g. harp -s prod migrate path/to/my_migration.go).
     kill     Kill server.
-    info     Print build info of servers (e.g. harp -s prod info).
+    info     Print build info of servers (e.g. harp -s prod info). Alias: status.
     log      Print real time logs of application (e.g. harp -s prod log).
     restart  Restart application (e.g. harp -s prod restart).
     init     Initialize a harp.json file.
     rollback
-        ls       List all the current releases.
+        ls       List all the current releases. Alias: l, list.
         $version Rollback to $version.
     inspect	Inspect script content and others.
     	deploy
@@ -819,4 +872,6 @@ func cleanCaches() {
 	}
 }
 
-func printVersion() { fmt.Printf("0.6.%d\n", version) }
+func printVersion() { fmt.Println(getVersion()) }
+
+func getVersion() string { return fmt.Sprintf("0.6.%d", version) }
