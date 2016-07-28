@@ -159,12 +159,12 @@ func (s *Server) deploy() {
 	}
 }
 
-func (s *Server) scriptData(typ, who string) interface{} {
+func (s *Server) scriptData(typ, who, checksum string) interface{} {
 	return map[string]interface{}{
 		"App":           cfg.App,
 		"Server":        s,
 		"SyncFiles":     s.syncFilesScript(),
-		"RestartServer": s.restartScript(typ, who),
+		"RestartServer": s.restartScript(typ, who, checksum),
 		"SaveRelease":   s.saveReleaseScript(),
 	}
 }
@@ -242,7 +242,7 @@ mkdir -p {{.GetLogDir}}
 touch {{.LogPath}}
 `))
 
-func (s *Server) restartScript(typ, who string) (script string) {
+func (s *Server) restartScript(typ, who, checksum string) (script string) {
 	app := cfg.App
 	log := s.LogPath()
 	pid := s.PIDPath()
@@ -266,9 +266,12 @@ func (s *Server) restartScript(typ, who string) (script string) {
 
 	script += s.GetHarpComposer(who)
 
+	if checksum != "" {
+		checksum = " (" + checksum + ")"
+	}
 	script += fmt.Sprintf(
-		`echo "[harp] $(date) $harp_composer %s server" | tee -a %s %s >/dev/null`+"\n",
-		typ, log, s.HistoryLogPath(),
+		`echo "[harp] $(date) $harp_composer %s server%s" | tee -a %s %s >/dev/null`+"\n",
+		typ, checksum, log, s.HistoryLogPath(),
 	)
 	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, s.GoPath, app.Name, args, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
@@ -330,7 +333,8 @@ func (s *Server) retrieveDeployScript() string {
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, s.scriptData("deployed", retrieveAuthor())); err != nil {
+	_, checksum := retrieveChecksum()
+	if err := tmpl.Execute(&buf, s.scriptData("deployed", retrieveAuthor(), checksum)); err != nil {
 		s.exitf(err.Error())
 	}
 
@@ -379,7 +383,7 @@ func (s *Server) retrieveRollbackScript() string {
 		Config:        cfg,
 		Server:        s,
 		SyncFiles:     s.syncFilesScript(),
-		RestartScript: s.restartScript("rollbacked", ""),
+		RestartScript: s.restartScript("rollbacked", "", ""),
 	}
 	var buf bytes.Buffer
 	if err := rollbackScriptTmpl.Execute(&buf, data); err != nil {
@@ -409,7 +413,7 @@ func (s Server) retrieveRestartScript(who string) string {
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, s.scriptData("restarted", who)); err != nil {
+	if err := tmpl.Execute(&buf, s.scriptData("restarted", who, "")); err != nil {
 		s.exitf(err.Error())
 	}
 

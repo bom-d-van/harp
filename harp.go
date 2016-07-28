@@ -506,7 +506,7 @@ func getBuildLog() string {
 	info += harpVersionPrefix + getVersion() + "\n"
 
 	vcs, checksum := retrieveChecksum()
-	info += vcs + " Checksum: " + checksum
+	info += vcs + " Checksum: " + checksum + "\n"
 
 	info += "Composer: " + retrieveAuthor() + "\n"
 
@@ -518,17 +518,17 @@ func getBuildLog() string {
 func retrieveChecksum() (vcs, checksum string) {
 	checksum = tryCmd("git", "rev-parse", "HEAD")
 	if checksum != "" {
-		return "Git", checksum
+		return "Git", strings.TrimSpace(checksum)
 	}
 
 	checksum = tryCmd("hg", "id", "-i")
 	if checksum != "" {
-		return "Hg", checksum
+		return "Hg", strings.TrimSpace(checksum)
 	}
 
 	checksum = tryCmd("bzr", "version-info", "--custom", `--template="{revision_id}\n"`)
 	if checksum != "" {
-		return "Bzr", checksum
+		return "Bzr", strings.TrimSpace(checksum)
 	}
 
 	return
