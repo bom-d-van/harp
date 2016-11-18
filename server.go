@@ -273,7 +273,7 @@ func (s *Server) restartScript(typ, who, checksum string) (script string) {
 		`echo "[harp] {\"datetime\": \"$(date)\", \"user\": \"$harp_composer\", \"type\": \"%s\"%s}" | tee -a %s %s >/dev/null`+"\n",
 		typ, checksum, log, s.HistoryLogPath(),
 	)
-	script += fmt.Sprintf("%s nohup %s/bin/%s %s >> %s 2>&1 &\n", envs, s.GoPath, app.Name, args, log)
+	script += fmt.Sprintf("%s nohup %s/bin/%s %s $@ >> %s 2>&1 &\n", envs, s.GoPath, app.Name, args, log)
 	script += fmt.Sprintf("echo $! > %s\n", pid)
 	script += "cd " + s.Home
 	return
